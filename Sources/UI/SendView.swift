@@ -6,6 +6,7 @@ struct SendView: View {
   @State private var importerPresented = false
   @State private var favoriteSheetPresented = false
   @State private var importError: String?
+  @State private var scannerPresented = false
 
   var body: some View {
     @Bindable var model = model
@@ -22,6 +23,13 @@ struct SendView: View {
       .background(AmbientBackground())
       .navigationTitle("Send")
       .toolbar {
+        ToolbarItem(placement: .topBarTrailing) {
+          Button {
+            scannerPresented = true
+          } label: {
+            Image(systemName: "qrcode.viewfinder")
+          }
+        }
         ToolbarItem(placement: .topBarTrailing) {
           Button {
             favoriteSheetPresented = true
@@ -59,6 +67,12 @@ struct SendView: View {
         AddFavoriteSheet { alias, host in
           model.addFavorite(alias: alias, host: host)
         }
+      }
+      .sheet(isPresented: $scannerPresented) {
+        QRScannerView { code in
+          handleScanned(code: code, model: model)
+        }
+        .ignoresSafeArea()
       }
     }
   }
@@ -218,6 +232,17 @@ struct SendView: View {
     guard !files.isEmpty else { return }
     model.selection = []
     model.send(files: files, to: device)
+  }
+
+  /// A scanned LocalSend code is either a pairing URL or a bare host.
+  private func handleScanned(code: String, model: AppModel) {
+    let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+    if let url = URL(string: trimmed), let host = url.host, !host.isEmpty {
+      model.addFavorite(alias: host, host: host)
+    } else if !trimmed.isEmpty {
+      model.addFavorite(alias: trimmed, host: trimmed)
+    }
+    scannerPresented = false
   }
 }
 

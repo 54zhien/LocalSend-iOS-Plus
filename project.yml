@@ -30,6 +30,7 @@ targets:
           - UIInterfaceOrientationPortrait
         NSLocalNetworkUsageDescription: LocalSend finds nearby devices on your local network to send and receive files.
         NSPhotoLibraryAddUsageDescription: LocalSend saves received photos to your library when you ask it to.
+        NSCameraUsageDescription: LocalSend uses the camera only to scan a pairing QR code from another device.
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
         # Peers may advertise http or https on the LAN; the protocol itself is local-only.

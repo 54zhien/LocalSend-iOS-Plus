@@ -1,75 +1,96 @@
 # LocalSend iOS Plus
 
-A native **SwiftUI** iOS client for [LocalSend](https://github.com/localsend/localsend), built around the iOS 26 **Liquid Glass** look.
+A native SwiftUI iOS client for [LocalSend](https://github.com/localsend/localsend), built around the
+iOS 26 Liquid Glass material (`glassEffect`, with an `ultraThinMaterial` fallback for older SDKs).
 
-It speaks the LocalSend v2 protocol itself — Foundation, Network, URLSession — with no Flutter engine and no Rust FFI. Every surface is a real SwiftUI/UIKit view, so the system glass material (`glassEffect`) can be used everywhere instead of being faked with blurs.
+The point of this project is the UI: everything is rendered by SwiftUI/UIKit, so cards, sheets, buttons
+and the tab bar are real system surfaces that the compositor can blur and refract — something a Flutter
+app cannot do, because Flutter draws all of its widgets into a single texture.
 
-> Status: **stage 1 — it moves files, but it is not yet at feature parity with the official client.** See [What is not there yet](#what-is-not-there-yet-stage-2).
+The protocol side is a from-scratch implementation of the LocalSend **v2** HTTP/TLS API, so the app
+talks to the official Flutter app, to LocalSend desktop and to other LocalSend clients on the same LAN.
 
 ## Build
 
 ```bash
-brew install xcodegen        # once
-xcodegen generate            # writes LocalSendNative.xcodeproj
+brew install xcodegen     # once
+cd LocalSend-iOS-Plus
+xcodegen generate
 open LocalSendNative.xcodeproj
 ```
 
-Requirements: **Xcode 26** SDK (for `glassEffect`), deployment target iOS 18. The project is described by `project.yml`; edit files freely, XcodeGen regenerates the project. For a physical device set your team in *Signing & Capabilities*.
+- Xcode 26 SDK required for `UIGlassEffect` / `glassEffect`. On an older SDK, delete the
+  `#available(iOS 26.0, *)` branch in `Sources/UI/Glass.swift` and the material fallback takes over.
+- Deployment target: iOS 18. Runs on iPhone (portrait).
+- App Group `group.org.localsend.native` is shared by the app and the share extension.
 
-## What works (stage 1)
+## What it does
 
 | Area | State |
 | --- | --- |
-| Receive server | Port **53317**: `/api/localsend/v2/info` (v1 + v2), `/register`, `/prepare-upload`, `/upload` (streamed to disk), `/cancel`. Sessions and per-file tokens are minted per request. |
-| Discovery | Probes `GET /api/localsend/v2/info` across the local /24 in batches of 32, rescans on an interval, and records peers that call *us*. |
-| Send | `prepare-upload` → per-file `upload` with progress; maps 204 declined, 403 PIN required, 409 blocked. |
-| UI | Glass tabs (Receive / Send / Settings), ambient light backdrop, file importer, device list, transfer sheet, share sheet for received files. |
-| Storage | Received files land in `Documents/LocalSend` (visible in Files). Alias, fingerprint and settings persist in `UserDefaults`. |
+| Receive over HTTP/HTTPS (v2) | ✅ `GET /info`, `POST /register`, `POST /prepare-upload`, `POST /upload`, `POST /cancel` |
+| Encryption | ✅ RSA-2048 self-signed certificate, mTLS in both directions, fingerprint = SHA-256 of the DER |
+| PIN | ✅ `pin` query parameter, 401 / 429 semantics, prompt on the sending side |
+| Approval | ✅ sheet with per-file checkboxes, decline returns 204, 409 while another session is live |
+| Received files | ✅ `Documents/LocalSend`, share sheet, optional save to Photos |
+| Discovery | ✅ `/24` probe against `GET /info` on port 53317 (https first, then http) |
+| Favourites | ✅ manual `alias + host` entries, persisted |
+| History | ✅ sent/received, persisted, swipe to delete |
+| Web download page | ✅ `GET /` plus `POST /prepare-download` + `GET /download` (PIN gated) |
+| Share extension | ✅ Files/Photos → app inbox → select and send |
+| QR pairing | ✅ show a pairing code on Receive, scan one on Send |
+| Liquid Glass | ✅ every surface, `glassEffect` on iOS 26 |
 
-## What is not there yet (stage 2)
+## Not there yet
 
-- **TLS / HTTPS.** LocalSend v2.1+ negotiates TLS with a self-signed certificate. This build advertises `protocol: http`, so it only talks to peers that accept plain HTTP.
-- **Approval prompt.** Incoming sessions are auto-accepted (quick-save behaviour); the accept/decline sheet with the file list is not wired yet.
-- PIN-protected peers, WebRTC transfer mode, favourites/history persistence, share extension, localisation (strings are English), web share / download page, QR code.
-- **Multicast announce.** iOS blocks UDP multicast without the `com.apple.developer.networking.multicast` entitlement, so peers are found by probing rather than announcing. Multicast-announcing peers are still discovered; this app does not appear in *their* lists until it registers with them.
+These are tracked, not hidden:
+
+- **Multicast announce** (`224.0.0.167:53317`). iOS refuses UDP multicast without the
+  `com.apple.developer.networking.multicast` entitlement, so discovery uses a subnet probe instead.
+  The probe finds multicast peers too, but it does not answer *their* announcements.
+- **Localisation.** Strings are English only; the Flutter app ships ~40 languages from
+  `app/assets/i18n`. Porting them means generating an `.xcstrings` catalog.
+- **Receive options / device details screens.** Defaults are applied directly (auto-accept when
+  Quick Save is on) instead of the Flutter app's options sheet, and device details are not shown.
+- **Legacy WebRTC path.** LocalSend v1 could fall back to WebRTC; this client speaks HTTP/TLS only,
+  like the current Flutter app.
 
 ## Layout
 
 ```
 Sources/
-  App/    LocalSendNativeApp.swift, AppModel.swift
-  Core/   Models.swift, NetworkInfo.swift, Settings.swift,
-          HTTPServer.swift, DiscoveryService.swift, TransferSender.swift
-  UI/     Glass.swift, ReceiveView.swift, SendView.swift,
-          SettingsView.swift, TransferProgressView.swift
-Resources/Info.plist     # generated by xcodegen from project.yml
-project.yml
+  Core/      protocol: HTTP server, TLS, identity, discovery, sender, stores
+  App/       AppModel, entry point
+  UI/        SwiftUI screens and the glass primitives
+  Resources/ Info.plist, entitlements
+ShareExtension/
+project.yml  XcodeGen spec
 ```
 
-## How the glass is applied
-
-`Sources/UI/Glass.swift` keeps the material in one place:
+## Glass
 
 ```swift
-if #available(iOS 26.0, *) {
-  content.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-} else {
-  content
-    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-    .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous)
-      .strokeBorder(.white.opacity(0.28), lineWidth: 0.8))
+extension View {
+  @ViewBuilder
+  func glassPanel(cornerRadius: CGFloat = 26, interactive: Bool = false) -> some View {
+    if #available(iOS 26.0, *) {
+      self.glassEffect(interactive ? .regular.interactive() : .regular,
+                       in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    } else {
+      self.background(.ultraThinMaterial,
+                      in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
+  }
 }
 ```
 
-`AmbientBackground` draws the colour field the glass refracts. If your SDK has no `glassEffect`, delete the `#available` branch — the app then renders the same layout with `ultraThinMaterial`.
+## Compatibility
 
-## Compatibility notes
+- Peers must accept plain HTTP on 53317 when encryption is off, and HTTPS with a self-signed
+  certificate when it is on. Both are LocalSend defaults.
+- iOS asks for Local Network permission on first launch — without it discovery and transfers fail.
 
-- Peers must accept `http` on port 53317. The official app does when it has not negotiated TLS.
-- `NSLocalNetworkUsageDescription` and `NSAppTransportSecurity.NSAllowsArbitraryLoads` are declared in `project.yml` — both are required by stage 1 and should be tightened once TLS lands.
+## Licence
 
-## License
-
-Apache License 2.0 — see [LICENSE](LICENSE).
-
-This is an independent client, not affiliated with the LocalSend project. Protocol design and the wire format come from [localsend/localsend](https://github.com/localsend/localsend) (Apache-2.0).
+Apache-2.0, same as LocalSend. This is an independent client; the protocol design and the
+LocalSend name belong to the LocalSend project.

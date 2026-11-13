@@ -2,6 +2,12 @@ import SwiftUI
 
 struct ReceiveView: View {
   @Environment(AppModel.self) private var model
+  @State private var showQR = false
+
+  private var pairingURL: URL {
+    let scheme = model.settings.encryption ? "https" : "http"
+    return URL(string: "\(scheme)://\(model.primaryAddress):\(model.deviceIdentity.port)")!
+  }
 
   var body: some View {
     NavigationStack {
@@ -26,6 +32,11 @@ struct ReceiveView: View {
         }
       }
       .refreshable { model.refreshIdentity() }
+      .sheet(isPresented: $showQR) {
+        qrSheet
+          .presentationDetents([.height(440)])
+          .presentationDragIndicator(.visible)
+      }
     }
   }
 
@@ -46,6 +57,14 @@ struct ReceiveView: View {
           .font(.system(.subheadline, design: .monospaced))
           .foregroundStyle(.secondary)
           .textSelection(.enabled)
+
+        Button {
+          showQR = true
+        } label: {
+          Label("Pairing code", systemImage: "qrcode")
+        }
+        .buttonStyle(.bordered)
+        .font(.footnote.weight(.semibold))
       }
       .frame(maxWidth: .infinity)
       .padding(.vertical, 6)
@@ -138,5 +157,24 @@ struct ReceiveView: View {
         .lineLimit(1)
         .truncationMode(.middle)
     }
+  }
+
+
+  private var qrSheet: some View {
+    VStack(spacing: 18) {
+      Text("Scan with LocalSend to send files to (model.deviceIdentity.alias)")
+        .font(.subheadline.weight(.semibold))
+        .multilineTextAlignment(.center)
+      QRCodeView(url: pairingURL)
+      Text(pairingURL.absoluteString)
+        .font(.system(.footnote, design: .monospaced))
+        .foregroundStyle(.secondary)
+        .textSelection(.enabled)
+      Button("Done") {
+        showQR = false
+      }
+      .buttonStyle(GlassProminentButtonStyle())
+    }
+    .padding(24)
   }
 }
