@@ -30,6 +30,11 @@ jobs:
       - name: Generate project
         run: xcodegen generate
 
+      - name: Verify string catalog
+        run: |
+          node tools/gen_strings.mjs
+          git diff --exit-code Resources/Localizable.xcstrings
+
       - name: Build for simulator
         run: |
           set -o pipefail
