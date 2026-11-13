@@ -7,6 +7,7 @@ struct SendView: View {
   @State private var favoriteSheetPresented = false
   @State private var importError: String?
   @State private var scannerPresented = false
+  @State private var detailsDevice: Device?
 
   var body: some View {
     @Bindable var model = model
@@ -67,6 +68,9 @@ struct SendView: View {
         AddFavoriteSheet { alias, host in
           model.addFavorite(alias: alias, host: host)
         }
+      }
+      .sheet(item: $detailsDevice) { device in
+        DeviceDetailsSheet(device: device)
       }
       .sheet(isPresented: $scannerPresented) {
         QRScannerView { code in
@@ -165,6 +169,27 @@ struct SendView: View {
             }
             .buttonStyle(.plain)
             .disabled(model.selection.isEmpty)
+            .contextMenu {
+              Button {
+                detailsDevice = device
+              } label: {
+                Label("Details", systemImage: "info.circle")
+              }
+              Button {
+                model.favorites.toggle(
+                  FavoriteDevice(
+                    fingerprint: device.fingerprint,
+                    alias: device.alias,
+                    host: device.host,
+                    port: device.port,
+                    deviceType: device.deviceType.rawValue,
+                    protocolName: device.protocolName
+                  )
+                )
+              } label: {
+                Label("Add favourite", systemImage: "star")
+              }
+            }
           }
           .contextMenu {
             Button("Remove", role: .destructive) {
