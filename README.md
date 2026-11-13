@@ -39,6 +39,9 @@ open LocalSendNative.xcodeproj
 | Web download page | ✅ `GET /` plus `POST /prepare-download` + `GET /download` (PIN gated) |
 | Share extension | ✅ Files/Photos → app inbox → select and send |
 | QR pairing | ✅ show a pairing code on Receive, scan one on Send |
+| Localisation | ✅ 32 UI strings × 58 languages, generated from the upstream i18n JSON |
+| Quick save modes | ✅ off / always / favourites only, plus auto finish |
+| Device details | ✅ long-press a device for details, favourite toggle, send |
 | Liquid Glass | ✅ every surface, `glassEffect` on iOS 26 |
 
 ## Not there yet
@@ -48,18 +51,29 @@ These are tracked, not hidden:
 - **Multicast announce** (`224.0.0.167:53317`). iOS refuses UDP multicast without the
   `com.apple.developer.networking.multicast` entitlement, so discovery uses a subnet probe instead.
   The probe finds multicast peers too, but it does not answer *their* announcements.
-- **Localisation.** Strings are English only; the Flutter app ships ~40 languages from
-  `app/assets/i18n`. Porting them means generating an `.xcstrings` catalog.
-- **Receive options / device details screens.** Defaults are applied directly (auto-accept when
-  Quick Save is on) instead of the Flutter app's options sheet, and device details are not shown.
-- **Legacy WebRTC path.** LocalSend v1 could fall back to WebRTC; this client speaks HTTP/TLS only,
-  like the current Flutter app.
+- **Multicast announce, continued.** Peers find us through the probe and through manual add / QR,
+  but we never send an announcement of our own.
+- **WebRTC transport.** Upstream keeps an experimental WebRTC path behind a Cargo feature and a
+  `sqlite`/signaling provider. Only the HTTP/TLS transport is implemented here; transfers between
+  this app and the Flutter app use HTTP, which is what upstream falls back to as well.
+- **Receive destination.** Files land in `Documents/LocalSend` (visible in Files); upstream lets you
+  pick an arbitrary folder.
+- **Only the strings that exist in the UI are translated.** New UI text needs an entry in
+  `tools/strings.json`; CI fails when `Resources/Localizable.xcstrings` is stale.
+
+## Localisation
+
+`Resources/i18n/*.json` are copied verbatim from upstream. `tools/strings.json` maps each English
+literal in the views to its upstream key, and `node tools/gen_strings.mjs` regenerates
+`Resources/Localizable.xcstrings` (SwiftUI treats a plain literal as a `LocalizedStringKey`, so no
+view code needs to change). The CI workflow re-runs the generator and fails on drift.
 
 ## Layout
 
 ```
 Sources/
   Core/      protocol: HTTP server, TLS, identity, discovery, sender, stores
+  Resources/ i18n JSON + generated Localizable.xcstrings
   App/       AppModel, entry point
   UI/        SwiftUI screens and the glass primitives
   Resources/ Info.plist, entitlements
