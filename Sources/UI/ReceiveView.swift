@@ -21,7 +21,7 @@ struct ReceiveView: View {
             } label: {
               Label("Receive via link", systemImage: "globe")
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(GlassProminentButtonStyle())
             .padding(.bottom, 24)
 
             if model.settings.downloadEnabled { downloadCard.padding(.bottom, 16) }

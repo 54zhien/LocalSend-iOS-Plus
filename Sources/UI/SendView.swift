@@ -354,9 +354,13 @@ struct AddFavoriteSheet: View {
         GlassCard {
           VStack(alignment: .leading, spacing: 12) {
             TextField("Name", text: $alias)
-              .textFieldStyle(.roundedBorder)
+              .textFieldStyle(.plain)
+              .padding(12)
+              .glassPanel()
             TextField("192.168.178.20", text: $host)
-              .textFieldStyle(.roundedBorder)
+              .textFieldStyle(.plain)
+              .padding(12)
+              .glassPanel()
               .keyboardType(.decimalPad)
               .autocorrectionDisabled()
           }

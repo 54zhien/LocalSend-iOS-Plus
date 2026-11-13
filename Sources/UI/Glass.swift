@@ -8,7 +8,7 @@ struct AmbientBackground: View {
 }
 
 enum AppRadius {
-  static let control: CGFloat = 16
+  static let control: CGFloat = 22
 }
 
 extension Color {

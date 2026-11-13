@@ -120,7 +120,7 @@ final class ScannerViewController: UIViewController, AVCaptureMetadataOutputObje
     frame.translatesAutoresizingMaskIntoConstraints = false
     frame.layer.borderColor = UIColor.white.withAlphaComponent(0.8).cgColor
     frame.layer.borderWidth = 2
-    frame.layer.cornerRadius = 24
+    frame.layer.cornerRadius = AppRadius.control
     frame.layer.cornerCurve = .continuous
     view.addSubview(frame)
 

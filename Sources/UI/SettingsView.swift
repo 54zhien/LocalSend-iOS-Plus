@@ -79,7 +79,9 @@ struct SettingsView: View {
 
         HStack {
           TextField("Device name", text: $aliasDraft)
-            .textFieldStyle(.roundedBorder)
+            .textFieldStyle(.plain)
+            .padding(12)
+            .glassPanel()
             .submitLabel(.done)
             .onSubmit {
               model.updateAlias(aliasDraft)
@@ -110,7 +112,9 @@ struct SettingsView: View {
 
         HStack {
           TextField("PIN (empty turns it off)", text: $pinDraft)
-            .textFieldStyle(.roundedBorder)
+            .textFieldStyle(.plain)
+            .padding(12)
+            .glassPanel()
             .keyboardType(.numberPad)
           Button("Save") {
             settings.pin = pinDraft
@@ -122,7 +126,9 @@ struct SettingsView: View {
 
         HStack {
           TextField("Port", text: $portDraft)
-            .textFieldStyle(.roundedBorder)
+            .textFieldStyle(.plain)
+            .padding(12)
+            .glassPanel()
             .keyboardType(.numberPad)
             .frame(maxWidth: 120)
           Button("Apply") {
