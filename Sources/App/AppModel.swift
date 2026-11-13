@@ -3,6 +3,28 @@ import Observation
 import UIKit
 
 /// Thread-safe snapshot of the files offered by the download API (read on the server queue).
+/// Snapshot of the identity the HTTP server answers `/info` with. The server runs on its
+/// own queue, so it cannot read main-actor state; AppModel writes, the server reads.
+final class InfoBox: @unchecked Sendable {
+  private let lock = NSLock()
+  private var stored: DeviceInfoDTO
+
+  init(_ value: DeviceInfoDTO) {
+    stored = value
+  }
+
+  func set(_ value: DeviceInfoDTO) {
+    lock.lock()
+    stored = value
+    lock.unlock()
+  }
+
+  var value: DeviceInfoDTO {
+    lock.lock()
+    defer { lock.unlock() }
+    return stored
+  }
+}
 final class FilesBox: @unchecked Sendable {
   private let lock = NSLock()
   private var files: [FileDTO] = []
