@@ -3,15 +3,10 @@ import SwiftUI
 struct ReceiveView: View {
   @Environment(AppModel.self) private var model
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @State private var showQR = false
+  @State private var showWebReceive = false
   @State private var showAdvanced = false
   @State private var spinning = false
   @State private var appeared = false
-
-  private var pairingURL: URL {
-    let scheme = model.settings.encryption ? "https" : "http"
-    return URL(string: "\(scheme)://\(model.primaryAddress):\(model.deviceIdentity.port)")!
-  }
 
   var body: some View {
     NavigationStack {
@@ -22,9 +17,9 @@ struct ReceiveView: View {
             hero
             Spacer(minLength: 40)
             Button {
-              showQR = true
+              showWebReceive = true
             } label: {
-              Label("Pairing code", systemImage: "qrcode")
+              Label("Receive via link", systemImage: "globe")
             }
             .buttonStyle(.bordered)
             .padding(.bottom, 24)
@@ -69,9 +64,9 @@ struct ReceiveView: View {
         }
       }
       .refreshable { model.refreshIdentity() }
-      .sheet(isPresented: $showQR) {
-        qrSheet
-          .presentationDetents([.height(440)])
+      .sheet(isPresented: $showWebReceive) {
+        WebReceiveView()
+          .presentationDetents([.large])
           .presentationDragIndicator(.visible)
       }
       .onAppear {
@@ -213,21 +208,4 @@ struct ReceiveView: View {
   }
 
 
-  private var qrSheet: some View {
-    VStack(spacing: 18) {
-      Text("Scan with LocalSend to send files to (model.deviceIdentity.alias)")
-        .font(.subheadline.weight(.semibold))
-        .multilineTextAlignment(.center)
-      QRCodeView(url: pairingURL)
-      Text(pairingURL.absoluteString)
-        .font(.system(.footnote, design: .monospaced))
-        .foregroundStyle(.secondary)
-        .textSelection(.enabled)
-      Button("Done") {
-        showQR = false
-      }
-      .buttonStyle(GlassProminentButtonStyle())
-    }
-    .padding(24)
-  }
 }

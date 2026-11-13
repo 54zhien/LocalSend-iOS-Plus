@@ -55,6 +55,7 @@ final class LocalHTTPServer {
   var pin: String?
   /// `nil` disables the web download API; otherwise the files offered to browsers.
   var downloadProvider: (() -> [FileDTO])?
+  var webUploadEnabled = false
   /// Where received files are written; falls back to `Documents/LocalSend`.
   var destinationProvider: (() -> URL)?
   var onEvent: ((ServerEvent) -> Void)?
@@ -355,6 +356,13 @@ final class LocalHTTPServer {
   }
 
   private func handleDownloadPage(connection: HTTPConnection) {
+    if webUploadEnabled,
+      let url = Bundle.main.url(forResource: "web-upload", withExtension: "html"),
+      let body = try? Data(contentsOf: url)
+    {
+      connection.respond(status: 200, body: body, contentType: "text/html; charset=utf-8")
+      return
+    }
     guard downloadProvider != nil else {
       connection.respondJSON(status: 404, value: ["message": "not found"])
       return

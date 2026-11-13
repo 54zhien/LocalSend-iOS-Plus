@@ -1,6 +1,9 @@
 {
   "_comment": "Additional Simplified Chinese strings for the SwiftUI app; keys are English UI literals.",
   "Media": "媒体",
+  "Receive via link": "通过链接接收",
+  "Copy link": "复制链接",
+  "Open this link in a browser on the same Wi-Fi network, choose files, then approve the request here.": "在同一 Wi-Fi 网络的浏览器中打开此链接，选好文件后在这里确认接收。",
   "General": "通用",
   "Theme": "主题",
   "Follow system": "跟随系统",

@@ -100,6 +100,8 @@ final class AppModel {
   private var activePeerAlias = ""
   private var activePeerFingerprint = ""
   private var started = false
+  private var webReceiveMode = false
+  var isWebReceiving: Bool { webReceiveMode }
 
   init() {
     deviceIdentity = DeviceIdentity(
@@ -166,11 +168,12 @@ final class AppModel {
 
   /// Re-applies settings that require restarting the listener.
   func applyNetworkSettings() {
+    let encrypted = settings.encryption && !webReceiveMode
     deviceIdentity = DeviceIdentity(
       alias: settings.alias,
       fingerprint: identity.fingerprint,
       port: settings.port,
-      protocolName: settings.encryption ? "https" : "http"
+      protocolName: encrypted ? "https" : "http"
     )
     server.stop()
     configureServer()
@@ -204,7 +207,7 @@ final class AppModel {
       alias: settings.alias,
       fingerprint: identity.fingerprint,
       port: settings.port,
-      protocolName: settings.encryption ? "https" : "http"
+      protocolName: settings.encryption && !webReceiveMode ? "https" : "http"
     )
     publishInfo()
   }
@@ -215,7 +218,8 @@ final class AppModel {
 
   private func configureServer() {
     server.identity = identity
-    server.encryption = settings.encryption
+    server.encryption = settings.encryption && !webReceiveMode
+    server.webUploadEnabled = webReceiveMode
     server.pin = settings.pin.isEmpty ? nil : settings.pin
     server.port = settings.port
     server.downloadProvider = settings.downloadEnabled ? { [downloadBox] in downloadBox.value } : nil
@@ -227,6 +231,18 @@ final class AppModel {
         self?.handle(event)
       }
     }
+  }
+
+  func beginWebReceive() {
+    guard !webReceiveMode else { return }
+    webReceiveMode = true
+    applyNetworkSettings()
+  }
+
+  func endWebReceive() {
+    guard webReceiveMode else { return }
+    webReceiveMode = false
+    applyNetworkSettings()
   }
 
   // MARK: Server events

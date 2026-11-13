@@ -11111,6 +11111,36 @@
         }
       }
     },
+    "Receive via link": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通过链接接收"
+          }
+        }
+      }
+    },
+    "Copy link": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "复制链接"
+          }
+        }
+      }
+    },
+    "Open this link in a browser on the same Wi-Fi network, choose files, then approve the request here.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在同一 Wi-Fi 网络的浏览器中打开此链接，选好文件后在这里确认接收。"
+          }
+        }
+      }
+    },
     "General": {
       "localizations": {
         "zh-Hans": {

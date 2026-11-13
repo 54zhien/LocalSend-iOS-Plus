@@ -37,7 +37,10 @@ struct RootView: View {
     .onOpenURL { _ in
       model.consumeShareInbox()
     }
-    .sheet(item: $model.incoming) { request in
+    .sheet(item: Binding(
+      get: { model.isWebReceiving ? nil : model.incoming },
+      set: { model.incoming = $0 }
+    )) { request in
       IncomingApprovalSheet(
         request: request,
         onAccept: { selected in model.accept(request, acceptedIds: selected) },
