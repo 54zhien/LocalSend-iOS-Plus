@@ -1,4 +1,4 @@
-# LocalSend iOS Plus
+# LocalSend Plus
 
 A native SwiftUI iOS client for [LocalSend](https://github.com/localsend/localsend), built around the
 iOS 26 Liquid Glass material (`glassEffect`, with an `ultraThinMaterial` fallback for older SDKs).
@@ -16,13 +16,13 @@ talks to the official Flutter app, to LocalSend desktop and to other LocalSend c
 brew install xcodegen     # once
 cd LocalSend-iOS-Plus
 xcodegen generate
-open LocalSendNative.xcodeproj
+open LocalSendPlus.xcodeproj
 ```
 
 - Xcode 26 SDK required for `UIGlassEffect` / `glassEffect`. On an older SDK, delete the
   `#available(iOS 26.0, *)` branch in `Sources/UI/Glass.swift` and the material fallback takes over.
 - Deployment target: iOS 18. Runs on iPhone (portrait).
-- App Group `group.org.localsend.native` is shared by the app and the share extension.
+- App Group `group.com.imzhien.localsendplus` is shared by the app and the share extension.
 
 ## What it does
 

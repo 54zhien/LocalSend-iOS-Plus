@@ -87,7 +87,7 @@ final class AppModel {
   /// Identity snapshot the HTTP server may read from its own queue.
   private let infoBox = InfoBox(
     DeviceInfoDTO(
-      alias: "LocalSend",
+      alias: "LocalSend Plus",
       version: "2.2",
       deviceModel: nil,
       deviceType: DeviceType.mobile.rawValue,
@@ -250,7 +250,7 @@ final class AppModel {
       receivedFiles.insert(file, at: 0)
       history.add(
         direction: .received,
-        alias: activePeerAlias.isEmpty ? "LocalSend" : activePeerAlias,
+        alias: activePeerAlias.isEmpty ? "LocalSend Plus" : activePeerAlias,
         files: [HistoryFile(name: fileName, size: Int64(size), relativePath: fileName)]
       )
       if settings.saveToPhotos, PhotoSaver.isMedia(url) {

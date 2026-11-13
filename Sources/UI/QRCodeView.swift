@@ -63,7 +63,7 @@ final class ScannerViewController: UIViewController, AVCaptureMetadataOutputObje
   var onCancel: (() -> Void)?
 
   private let session = AVCaptureSession()
-  private let sessionQueue = DispatchQueue(label: "org.localsend.native.scanner")
+  private let sessionQueue = DispatchQueue(label: "com.imzhien.localsendplus.scanner")
   private var previewLayer: AVCaptureVideoPreviewLayer?
   private var hasReported = false
 

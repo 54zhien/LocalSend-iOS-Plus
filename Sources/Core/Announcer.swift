@@ -9,7 +9,7 @@ import Foundation
 /// host-by-host gives the same effect without Apple's approval: the receiver matches the JSON
 /// and adds us to its device list.
 final class Announcer {
-  private let queue = DispatchQueue(label: "org.localsend.native.announcer")
+  private let queue = DispatchQueue(label: "com.imzhien.localsendplus.announcer")
   private var socketFD: Int32 = -1
 
   deinit {

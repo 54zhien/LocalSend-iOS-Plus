@@ -103,8 +103,8 @@ final class LocalIdentity {
     static let commonName: [UInt8] = [0x55, 0x04, 0x03]
   }
 
-  private static let keyTag = Data("org.localsend.native.identity.key".utf8)
-  private static let certTag = Data("org.localsend.native.identity.cert".utf8)
+  private static let keyTag = Data("com.imzhien.localsendplus.identity.key".utf8)
+  private static let certTag = Data("com.imzhien.localsendplus.identity.cert".utf8)
 
   let certificate: SecCertificate?
   let identity: SecIdentity?

@@ -4,10 +4,10 @@ import Foundation
 ///
 /// The extension cannot talk to the app directly, so it copies each picked item into
 /// `Inbox/` and appends a line to `pending.json`; the app drains that queue on launch and
-/// whenever it is opened through `localsendnative://share`.
+/// whenever it is opened through `localsendplus://share`.
 enum ShareInbox {
-  static let appGroup = "group.org.localsend.native"
-  static let scheme = "localsendnative"
+  static let appGroup = "group.com.imzhien.localsendplus"
+  static let scheme = "localsendplus"
 
   struct Item: Codable, Identifiable {
     var id: String = UUID().uuidString

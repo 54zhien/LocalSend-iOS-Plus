@@ -115,7 +115,7 @@ struct ReceiveView: View {
       VStack(alignment: .leading, spacing: 12) {
         SectionHeader(title: "Received")
         if model.receivedFiles.isEmpty {
-          Text("Files you receive land in Documents/LocalSend.")
+          Text("Files you receive land in Documents/LocalSend Plus.")
             .font(.footnote)
             .foregroundStyle(.secondary)
         } else {

@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct LocalSendNativeApp: App {
+struct LocalSendPlusApp: App {
   @State private var model = AppModel()
 
   var body: some Scene {

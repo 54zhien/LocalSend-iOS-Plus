@@ -61,7 +61,7 @@ final class LocalHTTPServer {
 
   var identityProvider: () -> DeviceInfoDTO = {
     DeviceInfoDTO(
-      alias: "LocalSend",
+      alias: "LocalSend Plus",
       version: "2.2",
       deviceModel: nil,
       deviceType: DeviceType.mobile.rawValue,
@@ -385,7 +385,7 @@ final class LocalHTTPServer {
   static func downloadsDirectory() -> URL {
     let base = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
       ?? FileManager.default.temporaryDirectory
-    return base.appendingPathComponent("LocalSend", isDirectory: true)
+    return base.appendingPathComponent("LocalSend Plus", isDirectory: true)
   }
 
   static func uniqueURL(in directory: URL, name: String) -> URL {

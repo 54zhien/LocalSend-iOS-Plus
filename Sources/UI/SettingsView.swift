@@ -135,7 +135,7 @@ struct SettingsView: View {
         HStack {
           VStack(alignment: .leading, spacing: 2) {
             Text("Receive folder")
-            Text(model.destination.displayName ?? "Default: Documents/LocalSend")
+            Text(model.destination.displayName ?? "Default: Documents/LocalSend Plus")
               .font(.caption)
               .foregroundStyle(.secondary)
           }
@@ -197,7 +197,7 @@ struct SettingsView: View {
         HStack {
           Text("App")
           Spacer()
-          Text("LocalSend iOS Plus").foregroundStyle(.secondary)
+          Text("LocalSend Plus").foregroundStyle(.secondary)
         }
         .font(.subheadline)
         HStack {
