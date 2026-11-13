@@ -103,10 +103,26 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent "$APP" LocalSendPlus-unsigned-app.zip
           ls -lh LocalSendPlus-unsigned.ipa LocalSendPlus-unsigned-app.zip
 
+      # Variant without the embedded share extension. Enterprise and free-personal
+      # signing tools routinely choke on the .appex (its own App ID and, for the App
+      # Group, its own capability), which surfaces as a failed install that leaves a
+      # grey waiting icon on the home screen.
+      - name: Package lite (no share extension)
+        run: |
+          set -euo pipefail
+          APP=build/Build/Products/Release-iphoneos/LocalSendPlus.app
+          rm -rf PayloadLite
+          mkdir -p PayloadLite
+          cp -R "$APP" PayloadLite/
+          rm -rf PayloadLite/LocalSendPlus.app/PlugIns
+          zip -qry LocalSendPlus-lite.ipa PayloadLite
+          ls -lh LocalSendPlus-lite.ipa
+
       - uses: actions/upload-artifact@v4
         with:
           name: LocalSendPlus-unsigned
           path: |
             LocalSendPlus-unsigned.ipa
             LocalSendPlus-unsigned-app.zip
+            LocalSendPlus-lite.ipa
           if-no-files-found: error
