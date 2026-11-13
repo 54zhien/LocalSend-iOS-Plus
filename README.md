@@ -33,7 +33,7 @@ open LocalSendNative.xcodeproj
 | PIN | ✅ `pin` query parameter, 401 / 429 semantics, prompt on the sending side |
 | Approval | ✅ sheet with per-file checkboxes, decline returns 204, 409 while another session is live |
 | Received files | ✅ `Documents/LocalSend`, share sheet, optional save to Photos |
-| Discovery | ✅ `/24` probe against `GET /info` on port 53317 (https first, then http) |
+| Discovery | ✅ `/24` probe against `GET /info` (https first, then http) **plus a unicast UDP announce** every 30 s, so peers list this device without waiting |
 | Favourites | ✅ manual `alias + host` entries, persisted |
 | History | ✅ sent/received, persisted, swipe to delete |
 | Web download page | ✅ `GET /` plus `POST /prepare-download` + `GET /download` (PIN gated) |
@@ -48,16 +48,18 @@ open LocalSendNative.xcodeproj
 
 These are tracked, not hidden:
 
-- **Multicast announce** (`224.0.0.167:53317`). iOS refuses UDP multicast without the
-  `com.apple.developer.networking.multicast` entitlement, so discovery uses a subnet probe instead.
-  The probe finds multicast peers too, but it does not answer *their* announcements.
+- **Multicast announce to `224.0.0.167`.** Sending to that group needs Apple's
+  `com.apple.developer.networking.multicast` entitlement (a request form, not a build setting).
+  The same JSON is therefore sent to every host in the subnet as a *unicast* datagram, which needs
+  no entitlement and produces the same effect on the receiving side. What still differs: we cannot
+  *join* the group, so peers' multicast announcements reach us only through the /24 probe.
 - **Multicast announce, continued.** Peers find us through the probe and through manual add / QR,
   but we never send an announcement of our own.
 - **WebRTC transport.** Upstream keeps an experimental WebRTC path behind a Cargo feature and a
   `sqlite`/signaling provider. Only the HTTP/TLS transport is implemented here; transfers between
   this app and the Flutter app use HTTP, which is what upstream falls back to as well.
-- **Receive destination.** Files land in `Documents/LocalSend` (visible in Files); upstream lets you
-  pick an arbitrary folder.
+- **Receive destination.** Choose any folder (stored as a security-scoped bookmark); the default is
+  `Documents/LocalSend`.
 - **Only the strings that exist in the UI are translated.** New UI text needs an entry in
   `tools/strings.json`; CI fails when `Resources/Localizable.xcstrings` is stale.
 

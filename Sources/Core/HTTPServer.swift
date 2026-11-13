@@ -55,6 +55,8 @@ final class LocalHTTPServer {
   var pin: String?
   /// `nil` disables the web download API; otherwise the files offered to browsers.
   var downloadProvider: (() -> [FileDTO])?
+  /// Where received files are written; falls back to `Documents/LocalSend`.
+  var destinationProvider: (() -> URL)?
   var onEvent: ((ServerEvent) -> Void)?
 
   var identityProvider: () -> DeviceInfoDTO = {
@@ -367,7 +369,7 @@ final class LocalHTTPServer {
   }
 
   func openDestination(for name: String, connection: HTTPConnection) -> (handle: FileHandle, url: URL)? {
-    let directory = Self.downloadsDirectory()
+    let directory = destinationProvider?() ?? Self.downloadsDirectory()
     try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     let target = Self.uniqueURL(in: directory, name: name)
     guard FileManager.default.createFile(atPath: target.path, contents: nil),

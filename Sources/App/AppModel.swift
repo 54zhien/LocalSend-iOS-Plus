@@ -63,6 +63,9 @@ final class AppModel {
   private(set) var addresses: [String] = []
   private(set) var serverRunning = false
   private(set) var receivedFiles: [ReceivedFile] = []
+  let destination = DestinationStore()
+  private let announcer = Announcer()
+  private var announceTask: Task<Void, Never>?
   var incoming: IncomingRequest?
   var outgoing: OutgoingTransfer?
   var pinRequest: PinRequest?
@@ -128,9 +131,34 @@ final class AppModel {
 
     discovery.start(identity: identity, ownFingerprint: identity.fingerprint, interval: settings.scanInterval)
     publishDownloads()
+    startAnnouncing()
+  }
+
+  /// Peers on the same subnet hear this datagram and add us to their list right away.
+  func announcePresence() {
+    let announce = deviceIdentity.announce(downloadEnabled: settings.downloadEnabled)
+    guard let payload = try? JSONEncoder().encode(announce) else { return }
+    announcer.announce(
+      payload,
+      hosts: NetworkInfo.candidateHosts(),
+      port: UInt16(settings.port)
+    )
+  }
+
+  private func startAnnouncing() {
+    announcePresence()
+    announceTask?.cancel()
+    announceTask = Task { [weak self] in
+      while !Task.isCancelled {
+        try? await Task.sleep(for: .seconds(30))
+        guard let self, !Task.isCancelled else { return }
+        self.announcePresence()
+      }
+    }
   }
 
   func stop() {
+    announceTask?.cancel()
     discovery.stop()
     server.stop()
     serverRunning = false
@@ -155,6 +183,7 @@ final class AppModel {
     }
     publishInfo()
     publishDownloads()
+    announcePresence()
   }
 
   func updateAlias(_ alias: String) {
@@ -191,6 +220,8 @@ final class AppModel {
     server.port = settings.port
     server.downloadProvider = settings.downloadEnabled ? { [downloadBox] in downloadBox.value } : nil
     server.identityProvider = { [infoBox] in infoBox.value }
+    let destinationBox = destination.box
+    server.destinationProvider = { destinationBox.value }
     server.onEvent = { [weak self] event in
       Task { @MainActor [weak self] in
         self?.handle(event)

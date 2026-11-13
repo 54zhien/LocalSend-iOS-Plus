@@ -66,7 +66,7 @@ struct MulticastAnnounce: Codable {
     case fingerprint
     case port
     case download
-    case announcement
+    case announcement = "announce"
     case protocolName = "protocol"
   }
 }

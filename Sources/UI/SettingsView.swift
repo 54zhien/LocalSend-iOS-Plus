@@ -1,8 +1,10 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
   @Environment(AppModel.self) private var model
   @Bindable var settings: AppSettings
+  @State private var choosingFolder = false
 
   @State private var aliasDraft = ""
   @State private var pinDraft = ""
@@ -21,6 +23,14 @@ struct SettingsView: View {
       }
       .background(AmbientBackground())
       .navigationTitle("Settings")
+      .fileImporter(
+        isPresented: $choosingFolder,
+        allowedContentTypes: [.folder],
+        allowsMultipleSelection: false
+      ) { result in
+        guard case let .success(urls) = result, let url = urls.first else { return }
+        _ = model.destination.setFolder(url)
+      }
       .onAppear {
         aliasDraft = settings.alias
         pinDraft = settings.pin
@@ -122,6 +132,21 @@ struct SettingsView: View {
         Text("Leave the transfer screen as soon as the last file is written.")
           .font(.caption)
           .foregroundStyle(.secondary)
+        HStack {
+          VStack(alignment: .leading, spacing: 2) {
+            Text("Receive folder")
+            Text(model.destination.displayName ?? "Default: Documents/LocalSend")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+          Spacer(minLength: 12)
+          Button("Choose") { choosingFolder = true }
+            .buttonStyle(.borderless)
+          if model.destination.folderURL != nil {
+            Button("Reset") { model.destination.clear() }
+              .buttonStyle(.borderless)
+          }
+        }
         Toggle("Save media to Photos", isOn: $settings.saveToPhotos)
         Toggle("Web download page", isOn: $settings.downloadEnabled)
           .onChange(of: settings.downloadEnabled) {
