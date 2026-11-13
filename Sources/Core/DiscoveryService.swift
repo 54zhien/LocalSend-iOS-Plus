@@ -15,11 +15,13 @@ final class DiscoveryService {
   private(set) var lastScan: Date?
 
   private var loop: Task<Void, Never>?
+  private var identity: LocalIdentity = LocalIdentity.load()
   private var ownFingerprint = ""
   private var interval: Double = 12
   private var known: [String: Device] = [:]
 
-  func start(ownFingerprint: String, interval: Double) {
+  func start(identity: LocalIdentity, ownFingerprint: String, interval: Double) {
+    self.identity = identity
     self.ownFingerprint = ownFingerprint
     self.interval = max(4, interval)
     guard loop == nil else { return }
@@ -42,7 +44,7 @@ final class DiscoveryService {
   }
 
   /// Records a peer that called our `/register` endpoint, so it shows up without waiting for a scan.
-  func register(peer: DeviceInfoDTO, host: String) {
+  func register(peer: DeviceInfoDTO, host: String, protocolName: String) {
     guard !host.isEmpty, peer.fingerprint != ownFingerprint else { return }
     let device = Device(
       id: peer.fingerprint,
@@ -50,8 +52,15 @@ final class DiscoveryService {
       deviceType: DeviceType(wire: peer.deviceType),
       host: host,
       port: peer.port ?? 53317,
-      lastSeen: Date()
+      lastSeen: Date(),
+      protocolName: protocolName
     )
+    absorb(device)
+  }
+
+  /// Adds a device that has already been resolved (for example by a probe).
+  func absorb(_ device: Device) {
+    guard device.id != ownFingerprint else { return }
     known[device.id] = device
     publish()
   }
@@ -62,6 +71,8 @@ final class DiscoveryService {
     defer { isScanning = false }
 
     let hosts = NetworkInfo.candidateHosts()
+    let identity = self.identity
+    let own = ownFingerprint
     var found: [String: Device] = [:]
 
     for start in stride(from: 0, to: hosts.count, by: 32) {
@@ -69,10 +80,10 @@ final class DiscoveryService {
       let batch = Array(hosts[start..<end])
       await withTaskGroup(of: Device?.self) { group in
         for host in batch {
-          group.addTask { await DeviceProbe.info(host: host) }
+          group.addTask { await DeviceProbe.info(host: host, identity: identity) }
         }
         for await device in group {
-          guard let device, device.id != ownFingerprint else { continue }
+          guard let device, device.id != own else { continue }
           found[device.id] = device
         }
       }
@@ -92,22 +103,38 @@ final class DiscoveryService {
   }
 }
 
-/// One-shot HTTP probe, free of actor isolation so the batches really run in parallel.
+/// One-shot probe, free of actor isolation so the batches really run in parallel.
+///
+/// TLS peers reject plain HTTP, so every host is tried over https first (trust accepted for the
+/// handshake, the announced fingerprint pins later transfers) and over http as a fallback.
 enum DeviceProbe {
-  private static let session: URLSession = {
+  static func info(host: String, identity: LocalIdentity) async -> Device? {
+    for scheme in ["https", "http"] {
+      if let device = await probe(host: host, scheme: scheme, identity: identity) {
+        return device
+      }
+    }
+    return nil
+  }
+
+  private static func probe(host: String, scheme: String, identity: LocalIdentity) async -> Device? {
+    guard let url = URL(string: "\(scheme)://\(host):53317/api/localsend/v2/info") else { return nil }
+
     let configuration = URLSessionConfiguration.ephemeral
-    configuration.timeoutIntervalForRequest = 0.8
-    configuration.timeoutIntervalForResource = 1.5
+    configuration.timeoutIntervalForRequest = 0.9
+    configuration.timeoutIntervalForResource = 1.4
     configuration.waitsForConnectivity = false
     configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
     configuration.urlCache = nil
-    return URLSession(configuration: configuration)
-  }()
 
-  static func info(host: String) async -> Device? {
-    guard let url = URL(string: "http://\(host):53317/api/localsend/v2/info") else { return nil }
+    let delegate = LocalSendSessionDelegate(identity: identity, policy: .acceptAny)
+    let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
+    defer { session.finishTasksAndInvalidate() }
+
     var request = URLRequest(url: url)
     request.httpMethod = "GET"
+    request.timeoutInterval = 0.9
+
     guard let (data, response) = try? await session.data(for: request),
       let http = response as? HTTPURLResponse,
       http.statusCode == 200,
@@ -116,13 +143,15 @@ enum DeviceProbe {
     else {
       return nil
     }
+
     return Device(
       id: dto.fingerprint,
       alias: dto.alias,
       deviceType: DeviceType(wire: dto.deviceType),
       host: host,
       port: dto.port ?? 53317,
-      lastSeen: Date()
+      lastSeen: Date(),
+      protocolName: scheme
     )
   }
 }

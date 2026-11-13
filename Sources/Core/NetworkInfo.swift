@@ -62,23 +62,14 @@ enum NetworkInfo {
 struct DeviceIdentity {
   var alias: String
   var fingerprint: String
-  var deviceModel: String
+  var deviceModel: String = UIDevice.current.model
   var version = "2.2"
   var port = 53317
+  /// `https` when encryption is enabled — the server then speaks TLS.
+  var protocolName = "https"
 
   var addresses: [String] { NetworkInfo.ipv4Addresses() }
   var primaryAddress: String { addresses.first ?? "0.0.0.0" }
-
-  static func load() -> DeviceIdentity {
-    let defaults = UserDefaults.standard
-    let alias = defaults.string(forKey: "alias") ?? UIDevice.current.name
-    var fingerprint = defaults.string(forKey: "fingerprint") ?? ""
-    if fingerprint.isEmpty {
-      fingerprint = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
-      defaults.set(fingerprint, forKey: "fingerprint")
-    }
-    return DeviceIdentity(alias: alias, fingerprint: fingerprint, deviceModel: UIDevice.current.model)
-  }
 
   func infoDTO(downloadEnabled: Bool) -> DeviceInfoDTO {
     DeviceInfoDTO(
@@ -88,7 +79,7 @@ struct DeviceIdentity {
       deviceType: DeviceType.mobile.rawValue,
       fingerprint: fingerprint,
       port: port,
-      protocolName: "http",
+      protocolName: protocolName,
       download: downloadEnabled
     )
   }
@@ -101,7 +92,7 @@ struct DeviceIdentity {
       deviceType: DeviceType.mobile.rawValue,
       fingerprint: fingerprint,
       port: port,
-      protocolName: "http",
+      protocolName: protocolName,
       download: downloadEnabled,
       announcement: true
     )

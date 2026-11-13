@@ -99,10 +99,21 @@ struct Device: Identifiable, Equatable {
   var host: String
   var port: Int
   var lastSeen: Date
+  /// `http` or `https`, as announced by the peer.
+  var protocolName: String = "http"
 
-  var baseURL: URL? {
-    URL(string: "http://\(host):\(port)")
+  var fingerprint: String { id }
+
+  func baseURL(encrypted: Bool) -> URL? {
+    URL(string: "\(encrypted ? "https" : "http")://\(host):\(port)")
   }
+}
+
+/// A pending upload request that needs the user's accept/decline decision.
+struct IncomingRequest: Identifiable, Equatable {
+  let id: String
+  var peerAlias: String
+  var files: [FileDTO]
 }
 
 /// A file the user picked for sending.
@@ -150,4 +161,5 @@ struct OutgoingTransfer: Identifiable, Equatable {
   var total: Int
   var isFinished: Bool
   var error: String?
+  var sessionId: String?
 }

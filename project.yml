@@ -5,11 +5,14 @@ options:
   deploymentTarget:
     iOS: "18.0"
   xcodeVersion: "16.0"
+  # The UI is English + Simplified Chinese; add a .lproj / .xcstrings for more.
+  developmentLanguage: en
 settings:
   base:
     SWIFT_VERSION: "5.0"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     CODE_SIGN_STYLE: Automatic
+    SWIFT_EMIT_LOC_STRINGS: YES
 targets:
   LocalSendNative:
     type: application
@@ -29,14 +32,46 @@ targets:
         NSPhotoLibraryAddUsageDescription: LocalSend saves received photos to your library when you ask it to.
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
-        # Stage 1 talks plain HTTP to LocalSend peers on the LAN (the protocol allows http or
-        # https; this build advertises http). Tighten this once the TLS/pinning layer lands.
+        # Peers may advertise http or https on the LAN; the protocol itself is local-only.
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
+        CFBundleURLTypes:
+          - CFBundleURLName: org.localsend.native
+            CFBundleURLSchemes:
+              - localsendnative
+    entitlements:
+      path: Resources/LocalSendNative.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.org.localsend.native
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.localsend.native
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Resources/Info.plist
-        SWIFT_EMIT_LOC_STRINGS: YES
+    dependencies:
+      - target: ShareExtension
+
+  ShareExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ShareExtension
+      - path: Sources/Core/ShareInbox.swift
+    info:
+      path: ShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: LocalSend
+    entitlements:
+      path: ShareExtension/ShareExtension.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.org.localsend.native
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.localsend.native.share
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: ShareExtension/Info.plist
+        SKIP_INSTALL: YES

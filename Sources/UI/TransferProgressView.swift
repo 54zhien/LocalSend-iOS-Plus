@@ -2,7 +2,20 @@ import SwiftUI
 
 struct TransferProgressView: View {
   @Environment(AppModel.self) private var model
-  let transfer: OutgoingTransfer
+
+  /// Read from the model so progress updates publish while the sheet is open.
+  private var transfer: OutgoingTransfer {
+    model.outgoing
+      ?? OutgoingTransfer(
+        id: "none",
+        deviceAlias: "",
+        fileNames: [],
+        completed: 0,
+        total: 0,
+        isFinished: true,
+        error: nil
+      )
+  }
 
   var body: some View {
     VStack(spacing: 18) {

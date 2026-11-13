@@ -15,6 +15,12 @@ final class AppSettings {
   var downloadEnabled: Bool { didSet { save() } }
   /// Seconds between two device scans.
   var scanInterval: Double { didSet { save() } }
+  /// HTTPS + mutual TLS, like the Flutter default.
+  var encryption: Bool { didSet { save() } }
+  /// Optional PIN required by `prepare-upload` and `prepare-download`.
+  var pin: String { didSet { save() } }
+  /// Listening port (53317 by default).
+  var port: Int { didSet { save() } }
 
   private struct Snapshot: Codable {
     var alias: String
@@ -22,6 +28,41 @@ final class AppSettings {
     var saveToPhotos: Bool
     var downloadEnabled: Bool
     var scanInterval: Double
+    var encryption: Bool?
+    var pin: String?
+    var port: Int?
+
+    init(from decoder: Decoder) throws {
+      let container = try decoder.container(keyedBy: CodingKeys.self)
+      alias = try container.decode(String.self, forKey: .alias)
+      quickSave = try container.decode(Bool.self, forKey: .quickSave)
+      saveToPhotos = try container.decode(Bool.self, forKey: .saveToPhotos)
+      downloadEnabled = try container.decode(Bool.self, forKey: .downloadEnabled)
+      scanInterval = try container.decode(Double.self, forKey: .scanInterval)
+      encryption = try container.decodeIfPresent(Bool.self, forKey: .encryption)
+      pin = try container.decodeIfPresent(String.self, forKey: .pin)
+      port = try container.decodeIfPresent(Int.self, forKey: .port)
+    }
+
+    init(
+      alias: String,
+      quickSave: Bool,
+      saveToPhotos: Bool,
+      downloadEnabled: Bool,
+      scanInterval: Double,
+      encryption: Bool,
+      pin: String,
+      port: Int
+    ) {
+      self.alias = alias
+      self.quickSave = quickSave
+      self.saveToPhotos = saveToPhotos
+      self.downloadEnabled = downloadEnabled
+      self.scanInterval = scanInterval
+      self.encryption = encryption
+      self.pin = pin
+      self.port = port
+    }
   }
 
   init() {
@@ -34,12 +75,18 @@ final class AppSettings {
       saveToPhotos = snapshot.saveToPhotos
       downloadEnabled = snapshot.downloadEnabled
       scanInterval = snapshot.scanInterval
+      encryption = snapshot.encryption ?? true
+      pin = snapshot.pin ?? ""
+      port = snapshot.port ?? 53317
     } else {
       alias = UIDevice.current.name
       quickSave = true
       saveToPhotos = false
       downloadEnabled = false
       scanInterval = 12
+      encryption = true
+      pin = ""
+      port = 53317
     }
   }
 
@@ -49,7 +96,10 @@ final class AppSettings {
       quickSave: quickSave,
       saveToPhotos: saveToPhotos,
       downloadEnabled: downloadEnabled,
-      scanInterval: scanInterval
+      scanInterval: scanInterval,
+      encryption: encryption,
+      pin: pin,
+      port: port
     )
     guard let data = try? JSONEncoder().encode(snapshot) else { return }
     UserDefaults.standard.set(data, forKey: "settings")

@@ -5,47 +5,101 @@ struct SettingsView: View {
   @Bindable var settings: AppSettings
 
   @State private var aliasDraft = ""
+  @State private var pinDraft = ""
+  @State private var portDraft = ""
 
   var body: some View {
     NavigationStack {
       ScrollView {
-        VStack(spacing: 16) {
+        VStack(spacing: 18) {
           deviceCard
           transfersCard
           discoveryCard
           aboutCard
         }
-        .padding(16)
-        .padding(.bottom, 24)
+        .padding(20)
       }
-      .scrollIndicators(.hidden)
+      .background(AmbientBackground())
       .navigationTitle("Settings")
-      .onAppear { aliasDraft = model.identity.alias }
-      .onChange(of: model.settings.downloadEnabled) { _, _ in
-        model.refreshIdentity()
+      .onAppear {
+        aliasDraft = settings.alias
+        pinDraft = settings.pin
+        portDraft = String(settings.port)
       }
     }
   }
 
   private var deviceCard: some View {
     GlassCard {
-      VStack(alignment: .leading, spacing: 12) {
+      VStack(alignment: .leading, spacing: 14) {
         SectionHeader(title: "Device")
-        TextField("Device name", text: $aliasDraft)
-          .textFieldStyle(.plain)
-          .font(.body.weight(.medium))
-          .submitLabel(.done)
-          .onSubmit { model.updateAlias(aliasDraft) }
-          .padding(12)
-          .glassPanel(cornerRadius: 14)
+
         HStack {
+          TextField("Device name", text: $aliasDraft)
+            .textFieldStyle(.roundedBorder)
+            .submitLabel(.done)
+            .onSubmit {
+              model.updateAlias(aliasDraft)
+              aliasDraft = model.settings.alias
+            }
+          Button("Save") {
+            model.updateAlias(aliasDraft)
+            aliasDraft = model.settings.alias
+          }
+          .font(.footnote.weight(.semibold))
+          .disabled(aliasDraft == settings.alias)
+        }
+
+        Toggle("Encryption (HTTPS + mTLS)", isOn: $settings.encryption)
+          .onChange(of: settings.encryption) { _, _ in
+            model.applyNetworkSettings()
+          }
+        Toggle("Require PIN", isOn: Binding(
+          get: { !settings.pin.isEmpty },
+          set: { enabled in
+            if !enabled {
+              settings.pin = ""
+              pinDraft = ""
+              model.applyNetworkSettings()
+            }
+          }
+        ))
+
+        HStack {
+          TextField("PIN (empty turns it off)", text: $pinDraft)
+            .textFieldStyle(.roundedBorder)
+            .keyboardType(.numberPad)
+          Button("Save") {
+            settings.pin = pinDraft
+            model.applyNetworkSettings()
+          }
+          .font(.footnote.weight(.semibold))
+          .disabled(pinDraft == settings.pin)
+        }
+
+        HStack {
+          TextField("Port", text: $portDraft)
+            .textFieldStyle(.roundedBorder)
+            .keyboardType(.numberPad)
+            .frame(maxWidth: 120)
+          Button("Apply") {
+            if let port = Int(portDraft), (1024...65535).contains(port) {
+              settings.port = port
+              model.applyNetworkSettings()
+            } else {
+              portDraft = String(settings.port)
+            }
+          }
+          .font(.footnote.weight(.semibold))
+        }
+
+        VStack(alignment: .leading, spacing: 4) {
           Text("Fingerprint")
-            .font(.subheadline)
+            .font(.caption)
             .foregroundStyle(.secondary)
-          Spacer()
-          Text(model.identity.fingerprint.prefix(16) + "…")
-            .font(.caption.monospaced())
-            .foregroundStyle(.secondary)
+          Text(model.identity.fingerprint)
+            .font(.system(.caption2, design: .monospaced))
+            .textSelection(.enabled)
         }
       }
     }
@@ -53,67 +107,50 @@ struct SettingsView: View {
 
   private var transfersCard: some View {
     GlassCard {
-      VStack(alignment: .leading, spacing: 8) {
+      VStack(alignment: .leading, spacing: 14) {
         SectionHeader(title: "Transfers")
-        Toggle(isOn: $settings.quickSave) {
-          VStack(alignment: .leading, spacing: 2) {
-            Text("Quick save").font(.subheadline.weight(.medium))
-            Text("Accept incoming files without asking.")
-              .font(.caption)
-              .foregroundStyle(.secondary)
+        Toggle("Quick save (auto accept)", isOn: $settings.quickSave)
+        Text("Skip the confirmation sheet and receive files immediately.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        Toggle("Save media to Photos", isOn: $settings.saveToPhotos)
+        Toggle("Web download page", isOn: $settings.downloadEnabled)
+          .onChange(of: settings.downloadEnabled) {
+            model.applyNetworkSettings()
           }
-        }
-        Divider().opacity(0.4)
-        Toggle(isOn: $settings.saveToPhotos) {
-          VStack(alignment: .leading, spacing: 2) {
-            Text("Save photos to library").font(.subheadline.weight(.medium))
-            Text("Also import received images into Photos.")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
-        }
-        Divider().opacity(0.4)
-        Toggle(isOn: $settings.downloadEnabled) {
-          VStack(alignment: .leading, spacing: 2) {
-            Text("Allow web downloads").font(.subheadline.weight(.medium))
-            Text("Advertise the download API to browsers.")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
-        }
       }
     }
   }
 
   private var discoveryCard: some View {
     GlassCard {
-      VStack(alignment: .leading, spacing: 12) {
+      VStack(alignment: .leading, spacing: 14) {
         SectionHeader(title: "Discovery")
         Stepper(
-          value: Binding(
-            get: { settings.scanInterval },
-            set: { value in
-              settings.scanInterval = value
-              model.discovery.restart(interval: value)
-            }
-          ),
+          "Scan every \(Int(settings.scanInterval))s",
+          value: $settings.scanInterval,
           in: 4...60,
           step: 4
-        ) {
-          Text("Scan every \(Int(settings.scanInterval))s")
-            .font(.subheadline.weight(.medium))
+        )
+        .onChange(of: settings.scanInterval) {
+          model.discovery.restart(interval: settings.scanInterval)
         }
-        Button {
-          Task { await model.discovery.scan() }
-        } label: {
-          Label("Scan now", systemImage: "antenna.radiowaves.left.and.right")
-            .font(.subheadline.weight(.semibold))
-        }
-        .buttonStyle(GlassProminentButtonStyle())
-        if let lastScan = model.discovery.lastScan {
-          Text("Last scan \(lastScan.formatted(date: .omitted, time: .standard))")
-            .font(.caption)
-            .foregroundStyle(.secondary)
+
+        HStack {
+          Button {
+            Task { await model.discovery.scan() }
+          } label: {
+            Label("Scan now", systemImage: "arrow.triangle.2.circlepath")
+          }
+          .buttonStyle(GlassProminentButtonStyle())
+
+          Spacer(minLength: 0)
+
+          if let last = model.discovery.lastScan {
+            Text(last.formatted(date: .omitted, time: .shortened))
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
         }
       }
     }
@@ -121,21 +158,27 @@ struct SettingsView: View {
 
   private var aboutCard: some View {
     GlassCard {
-      VStack(alignment: .leading, spacing: 8) {
+      VStack(alignment: .leading, spacing: 10) {
         SectionHeader(title: "About")
-        row("App", "LocalSend (SwiftUI)")
-        row("Protocol", "v2.2 · HTTP")
-        row("Port", "\(model.identity.port)")
-        row("Devices seen", "\(model.discovery.devices.count)")
+        HStack {
+          Text("App")
+          Spacer()
+          Text("LocalSend iOS Plus").foregroundStyle(.secondary)
+        }
+        .font(.subheadline)
+        HStack {
+          Text("Protocol")
+          Spacer()
+          Text("v2.2 · \(settings.encryption ? "HTTPS" : "HTTP")").foregroundStyle(.secondary)
+        }
+        .font(.subheadline)
+        HStack {
+          Text("Devices seen")
+          Spacer()
+          Text(String(model.discovery.devices.count)).foregroundStyle(.secondary)
+        }
+        .font(.subheadline)
       }
-    }
-  }
-
-  private func row(_ title: String, _ value: String) -> some View {
-    HStack {
-      Text(title).font(.subheadline).foregroundStyle(.secondary)
-      Spacer()
-      Text(value).font(.subheadline.weight(.medium))
     }
   }
 }
