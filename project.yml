@@ -12,6 +12,7 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     CODE_SIGN_STYLE: Automatic
     SWIFT_EMIT_LOC_STRINGS: YES
+    ASSETCATALOG_COMPILER_APPICON_NAME: LocalSendPlus
 targets:
   LocalSendPlus:
     type: application
