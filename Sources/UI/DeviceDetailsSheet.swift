@@ -78,7 +78,7 @@ struct DeviceDetailsSheet: View {
 
   private func row(_ title: String, _ value: String, monospaced: Bool = false) -> some View {
     HStack(alignment: .firstTextBaseline) {
-      Text(title)
+      Text(LocalizedStringKey(title))
         .font(.caption)
         .foregroundStyle(.secondary)
       Spacer(minLength: 12)

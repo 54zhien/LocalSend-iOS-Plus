@@ -7,10 +7,10 @@ struct IncomingApprovalSheet: View {
   @State private var selected: Set<String>
 
   let request: IncomingRequest
-  let onAccept: () -> Void
+  let onAccept: (Set<String>) -> Void
   let onDecline: () -> Void
 
-  init(request: IncomingRequest, onAccept: @escaping () -> Void, onDecline: @escaping () -> Void) {
+  init(request: IncomingRequest, onAccept: @escaping (Set<String>) -> Void, onDecline: @escaping () -> Void) {
     self.request = request
     self.onAccept = onAccept
     self.onDecline = onDecline
@@ -42,7 +42,7 @@ struct IncomingApprovalSheet: View {
         }
         ToolbarItem(placement: .confirmationAction) {
           Button(selected.isEmpty ? String(localized: "Accept") : "\(String(localized: "Accept")) \(selected.count)") {
-            onAccept()
+            onAccept(selected)
             dismiss()
           }
           .disabled(selected.isEmpty)

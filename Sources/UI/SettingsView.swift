@@ -57,7 +57,7 @@ struct SettingsView: View {
     HStack {
       Text(LocalizedStringKey(title))
       Spacer(minLength: 12)
-      Text(value).foregroundStyle(.secondary)
+      Text(LocalizedStringKey(value)).foregroundStyle(.secondary)
     }
   }
 
@@ -147,7 +147,7 @@ struct SettingsView: View {
           Text("Favourites only").tag(QuickSaveMode.favourites)
         }
         .pickerStyle(.segmented)
-        Text(quickSaveHint)
+        Text(LocalizedStringKey(quickSaveHint))
           .font(.caption)
           .foregroundStyle(.secondary)
         Toggle("Auto finish", isOn: $settings.autoFinish)
@@ -157,7 +157,7 @@ struct SettingsView: View {
         HStack {
           VStack(alignment: .leading, spacing: 2) {
             Text("Receive folder")
-            Text(model.destination.displayName ?? "Default: Documents/LocalSend Plus")
+            Text(model.destination.displayName ?? String(localized: "Default: Documents/LocalSend Plus"))
               .font(.caption)
               .foregroundStyle(.secondary)
           }

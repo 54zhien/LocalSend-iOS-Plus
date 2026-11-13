@@ -255,7 +255,7 @@ struct SendView: View {
           HStack(spacing: 12) {
             Image(systemName: "desktopcomputer")
               .font(.title2)
-            Text(model.discovery.isScanning ? "Scanning the local network…" : "No device found yet. Pull to rescan.")
+            Text(LocalizedStringKey(model.discovery.isScanning ? "Scanning the local network…" : "No device found yet. Pull to rescan."))
               .font(.subheadline)
           }
           .foregroundStyle(.secondary)

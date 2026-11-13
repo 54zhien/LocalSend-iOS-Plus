@@ -271,8 +271,8 @@ final class AppModel {
 
   // MARK: Receiving
 
-  func accept(_ request: IncomingRequest) {
-    server.decide(sessionId: request.id, acceptedIds: Set(request.files.map(\.id)))
+  func accept(_ request: IncomingRequest, acceptedIds: Set<String>? = nil) {
+    server.decide(sessionId: request.id, acceptedIds: acceptedIds ?? Set(request.files.map(\.id)))
     if incoming?.id == request.id { incoming = nil }
   }
 

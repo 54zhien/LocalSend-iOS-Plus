@@ -40,7 +40,7 @@ struct RootView: View {
     .sheet(item: $model.incoming) { request in
       IncomingApprovalSheet(
         request: request,
-        onAccept: { model.accept(request) },
+        onAccept: { selected in model.accept(request, acceptedIds: selected) },
         onDecline: { model.decline(request) }
       )
     }

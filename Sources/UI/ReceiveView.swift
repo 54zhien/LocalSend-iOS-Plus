@@ -201,11 +201,11 @@ struct ReceiveView: View {
 
   private func row(_ label: String, _ value: String) -> some View {
     HStack {
-      Text(label)
+      Text(LocalizedStringKey(label))
         .font(.subheadline)
         .foregroundStyle(.secondary)
       Spacer(minLength: 8)
-      Text(value)
+      Text(LocalizedStringKey(value))
         .font(.subheadline.weight(.medium))
         .lineLimit(1)
         .truncationMode(.middle)
