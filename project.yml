@@ -23,8 +23,8 @@ targets:
           - "i18n"
           - "Info.plist"
           - "LocalSendPlus.entitlements"
-          - "LocalSendPlus.icon"
-      - path: Resources/LocalSendPlus.icon
+          - "AppIcon.icon"
+      - path: Resources/AppIcon.icon
         type: file
         buildPhase: resources
     info:
@@ -58,7 +58,7 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Resources/Info.plist
-        ASSETCATALOG_COMPILER_APPICON_NAME: LocalSendPlus
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
       - target: ShareExtension
 
