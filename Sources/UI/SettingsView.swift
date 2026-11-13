@@ -19,6 +19,16 @@ struct SettingsView: View {
           deviceCard
           discoveryCard
           aboutCard
+          VStack(spacing: 10) {
+            Image("LocalSendLogo")
+              .resizable()
+              .renderingMode(.template)
+              .foregroundStyle(.tint)
+              .frame(width: 120, height: 120)
+            Text("LocalSend").font(.largeTitle.weight(.semibold))
+          }
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 45)
         }
         .padding(20)
       }
@@ -215,7 +225,7 @@ struct SettingsView: View {
   private var aboutCard: some View {
     GlassCard {
       VStack(alignment: .leading, spacing: 10) {
-        SectionHeader(title: "About")
+        SectionHeader(title: "Other")
         HStack {
           Text("App")
           Spacer()
@@ -234,6 +244,9 @@ struct SettingsView: View {
           Text(String(model.discovery.devices.count)).foregroundStyle(.secondary)
         }
         .font(.subheadline)
+        Link("Support LocalSend", destination: URL(string: "https://localsend.org")!)
+        Link("Privacy policy", destination: URL(string: "https://localsend.org/privacy")!)
+        Link("Terms of use", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
       }
     }
   }
