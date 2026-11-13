@@ -93,6 +93,13 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             build
 
+      - name: Verify share extension metadata
+        run: |
+          set -euo pipefail
+          INFO=build/Build/Products/Release-iphoneos/LocalSendPlus.app/PlugIns/ShareExtension.appex/Info.plist
+          test "$(plutil -extract NSExtension.NSExtensionPointIdentifier raw -o - "$INFO")" = com.apple.share-services
+          test "$(plutil -extract NSExtension.NSExtensionPrincipalClass raw -o - "$INFO")" = ShareExtension.ShareViewController
+
       - name: Package
         run: |
           set -euo pipefail
