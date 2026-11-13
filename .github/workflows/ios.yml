@@ -111,12 +111,16 @@ jobs:
         run: |
           set -euo pipefail
           APP=build/Build/Products/Release-iphoneos/LocalSendPlus.app
-          rm -rf PayloadLite
-          mkdir -p PayloadLite
-          cp -R "$APP" PayloadLite/
-          rm -rf PayloadLite/LocalSendPlus.app/PlugIns
-          zip -qry LocalSendPlus-lite.ipa PayloadLite
-          ls -lh LocalSendPlus-lite.ipa
+          rm -rf Lite
+          mkdir -p Lite/Payload
+          cp -R "$APP" Lite/Payload/
+          rm -rf Lite/Payload/LocalSendPlus.app/PlugIns
+          # The archive root MUST be Payload/ - anything else and every signing
+          # tool (and installd) reports a missing Info.plist.
+          ( cd Lite && zip -qry ../LocalSendPlus-lite.ipa Payload )
+          ditto -c -k --sequesterRsrc --keepParent Lite/Payload/LocalSendPlus.app LocalSendPlus-lite-app.zip
+          unzip -Z1 LocalSendPlus-lite.ipa | head -3
+          ls -lh LocalSendPlus-lite.ipa LocalSendPlus-lite-app.zip
 
       - uses: actions/upload-artifact@v4
         with:
@@ -125,4 +129,5 @@ jobs:
             LocalSendPlus-unsigned.ipa
             LocalSendPlus-unsigned-app.zip
             LocalSendPlus-lite.ipa
+            LocalSendPlus-lite-app.zip
           if-no-files-found: error
