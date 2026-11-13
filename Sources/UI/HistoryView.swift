@@ -58,7 +58,7 @@ struct HistoryView: View {
   }
 
   private func entryRow(_ entry: HistoryEntry) -> some View {
-    GlassCard(cornerRadius: 22) {
+    GlassCard(cornerRadius: AppRadius.control) {
       VStack(alignment: .leading, spacing: 10) {
         HStack(spacing: 10) {
           Image(systemName: entry.direction == .received ? "arrow.down.circle" : "arrow.up.circle")

@@ -13,6 +13,7 @@ import { join } from 'node:path';
 const I18N = 'Resources/i18n';
 const OUT = 'Resources/Localizable.xcstrings';
 const MAP = JSON.parse(readFileSync('tools/strings.json', 'utf8'));
+const OVERRIDES = JSON.parse(readFileSync('tools/zh-Hans-overrides.json', 'utf8'));
 
 const LOCALE_MAP = {
   'zh-CN': 'zh-Hans',
@@ -51,15 +52,19 @@ function resolve(table, key, depth = 0) {
 
 const strings = {};
 let localized = 0;
-for (const [literal, key] of Object.entries(MAP)) {
+for (const literal of new Set([...Object.keys(MAP), ...Object.keys(OVERRIDES)])) {
   if (literal.startsWith('_')) continue;
+  const key = MAP[literal];
   const localizations = {};
   for (const [tag, table] of tables) {
     if (tag === 'en') continue;
-    const value = resolve(table, key);
+    const value = key ? resolve(table, key) : undefined;
     if (value && value !== literal) {
       localizations[tag] = { stringUnit: { state: 'translated', value } };
     }
+  }
+  if (OVERRIDES[literal]) {
+    localizations['zh-Hans'] = { stringUnit: { state: 'translated', value: OVERRIDES[literal] } };
   }
   if (Object.keys(localizations).length > 0) localized += 1;
   strings[literal] = { localizations };

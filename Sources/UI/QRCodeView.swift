@@ -20,9 +20,9 @@ struct QRCodeView: View {
         .scaledToFit()
         .frame(width: size, height: size)
         .padding(12)
-        .background(.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(.white, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
     } else {
-      RoundedRectangle(cornerRadius: 18, style: .continuous)
+      RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
         .fill(.white.opacity(0.12))
         .frame(width: size, height: size)
         .overlay(Image(systemName: "qrcode").font(.system(size: 48)).foregroundStyle(.secondary))

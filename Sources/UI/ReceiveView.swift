@@ -76,26 +76,32 @@ struct ReceiveView: View {
       }
       .onAppear {
         appeared = true
-        spinning = model.serverRunning && !reduceMotion
+        spinning = model.serverRunning && model.settings.animations && !reduceMotion
       }
       .onDisappear { spinning = false }
       .onChange(of: model.serverRunning) { _, running in
-        spinning = running && !reduceMotion
+        spinning = running && model.settings.animations && !reduceMotion
       }
     }
   }
 
   private var hero: some View {
     VStack(spacing: 12) {
-      Image("LocalSendLogo")
-        .resizable()
-        .renderingMode(.template)
-        .foregroundStyle(.tint)
-        .frame(width: 200, height: 200)
-        .rotationEffect(.degrees(spinning ? 360 : 0))
-        .animation(.linear(duration: 15).repeatForever(autoreverses: false), value: spinning)
-        .opacity(appeared ? 1 : 0)
-        .animation(.easeOut(duration: 0.3).delay(0.2), value: appeared)
+      ZStack {
+        Image("LocalSendLogoRing")
+          .resizable()
+          .renderingMode(.template)
+          .foregroundStyle(.tint)
+          .rotationEffect(.degrees(spinning ? 360 : 0))
+          .animation(.linear(duration: 15).repeatForever(autoreverses: false), value: spinning)
+        Image("LocalSendLogoCenter")
+          .resizable()
+          .renderingMode(.template)
+          .foregroundStyle(.tint)
+      }
+      .frame(width: 200, height: 200)
+      .opacity(appeared ? 1 : 0)
+      .animation(.easeOut(duration: 0.3).delay(0.2), value: appeared)
 
       Text(model.deviceIdentity.alias)
         .font(.system(size: 48, weight: .regular))
@@ -172,7 +178,7 @@ struct ReceiveView: View {
                 .font(.system(size: 20))
                 .foregroundStyle(.tint)
                 .frame(width: 36, height: 36)
-                .glassPanel(cornerRadius: 10)
+                .glassPanel(cornerRadius: AppRadius.control)
               VStack(alignment: .leading, spacing: 2) {
                 Text(file.name)
                   .font(.subheadline.weight(.medium))

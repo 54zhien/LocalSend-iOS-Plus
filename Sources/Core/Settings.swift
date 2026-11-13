@@ -25,6 +25,7 @@ final class AppSettings {
   var pin: String { didSet { save() } }
   /// Listening port (53317 by default).
   var port: Int { didSet { save() } }
+  var animations: Bool { didSet { save() } }
 
   private struct Snapshot: Codable {
     var alias: String
@@ -37,6 +38,7 @@ final class AppSettings {
     var encryption: Bool?
     var pin: String?
     var port: Int?
+    var animations: Bool?
 
     init(from decoder: Decoder) throws {
       let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -50,6 +52,7 @@ final class AppSettings {
       encryption = try container.decodeIfPresent(Bool.self, forKey: .encryption)
       pin = try container.decodeIfPresent(String.self, forKey: .pin)
       port = try container.decodeIfPresent(Int.self, forKey: .port)
+      animations = try container.decodeIfPresent(Bool.self, forKey: .animations)
     }
 
     init(
@@ -62,7 +65,8 @@ final class AppSettings {
       scanInterval: Double,
       encryption: Bool,
       pin: String,
-      port: Int
+      port: Int,
+      animations: Bool
     ) {
       self.alias = alias
       self.quickSave = quickSave
@@ -74,6 +78,7 @@ final class AppSettings {
       self.encryption = encryption
       self.pin = pin
       self.port = port
+      self.animations = animations
     }
   }
 
@@ -92,6 +97,7 @@ final class AppSettings {
       encryption = snapshot.encryption ?? true
       pin = snapshot.pin ?? ""
       port = snapshot.port ?? 53317
+      animations = snapshot.animations ?? true
     } else {
       alias = UIDevice.current.name
       quickSave = true
@@ -103,6 +109,7 @@ final class AppSettings {
       encryption = true
       pin = ""
       port = 53317
+      animations = true
     }
   }
 
@@ -117,7 +124,8 @@ final class AppSettings {
       scanInterval: scanInterval,
       encryption: encryption,
       pin: pin,
-      port: port
+      port: port,
+      animations: animations
     )
     guard let data = try? JSONEncoder().encode(snapshot) else { return }
     UserDefaults.standard.set(data, forKey: "settings")

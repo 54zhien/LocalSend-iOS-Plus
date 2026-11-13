@@ -1,9 +1,14 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SendView: View {
   @Environment(AppModel.self) private var model
 
   @State private var importerPresented = false
+  @State private var folderPickerPresented = false
+  @State private var mediaPickerPresented = false
+  @State private var textSheetPresented = false
+  @State private var textDraft = ""
   @State private var favoriteSheetPresented = false
   @State private var scannerPresented = false
   @State private var detailsDevice: Device?
@@ -43,11 +48,47 @@ struct SendView: View {
       .sheet(isPresented: $importerPresented) {
         FilePicker(
           onPick: { urls in
-            model.selection = urls.compactMap(SelectedFile.make(from:))
+            model.selection.append(contentsOf: urls.compactMap(SelectedFile.make(from:)))
             importerPresented = false
           },
           onCancel: { importerPresented = false }
         )
+      }
+      .sheet(isPresented: $folderPickerPresented) {
+        FilePicker(contentTypes: [.folder], allowsMultipleSelection: false,
+          onPick: { urls in
+            model.selection.append(contentsOf: urls.flatMap(SelectionStaging.files(in:)))
+            folderPickerPresented = false
+          },
+          onCancel: { folderPickerPresented = false }
+        )
+      }
+      .sheet(isPresented: $mediaPickerPresented) {
+        MediaPicker(onPick: { urls in
+          model.selection.append(contentsOf: urls.compactMap(SelectedFile.make(from:)))
+          mediaPickerPresented = false
+        }, onCancel: { mediaPickerPresented = false })
+      }
+      .sheet(isPresented: $textSheetPresented) {
+        NavigationStack {
+          TextEditor(text: $textDraft)
+            .padding(12)
+            .navigationTitle("Text")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+              ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { textSheetPresented = false }
+              }
+              ToolbarItem(placement: .confirmationAction) {
+                Button("Add") {
+                  do { model.selection.append(try SelectionStaging.text(textDraft)) }
+                  catch { model.errorMessage = error.localizedDescription }
+                  textSheetPresented = false
+                }
+                .disabled(textDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+              }
+            }
+        }
       }
       .sheet(isPresented: $favoriteSheetPresented) {
         AddFavoriteSheet { alias, host in
@@ -72,24 +113,24 @@ struct SendView: View {
   @ViewBuilder
   private func selectionCard(model: AppModel) -> some View {
     if model.selection.isEmpty {
-      VStack(alignment: .leading, spacing: 10) {
+      VStack(alignment: .leading, spacing: 14) {
         SectionHeader(title: "Selection")
-        Button {
-          importerPresented = true
-        } label: {
-          VStack(spacing: 5) {
-            Image(systemName: "doc.badge.plus")
-              .font(.title3)
-            Text("Add files")
-              .font(.caption)
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+          selectionButton("Media", symbol: "photo") { mediaPickerPresented = true }
+          selectionButton("Text", symbol: "text.alignleft") { textSheetPresented = true }
+          selectionButton("Clipboard", symbol: "doc.on.clipboard") {
+            do {
+              let files = try SelectionStaging.clipboard()
+              if files.isEmpty { model.errorMessage = String(localized: "Clipboard is empty") }
+              model.selection.append(contentsOf: files)
+            } catch { model.errorMessage = error.localizedDescription }
           }
-          .frame(width: 90, height: 65)
-          .glassPanel(cornerRadius: 10, interactive: true)
+          selectionButton("File", symbol: "doc") { importerPresented = true }
+          selectionButton("Folder", symbol: "folder") { folderPickerPresented = true }
         }
-        .buttonStyle(.plain)
       }
     } else {
-      GlassCard(cornerRadius: 16) {
+      GlassCard(cornerRadius: AppRadius.control) {
         VStack(alignment: .leading, spacing: 12) {
         HStack {
           SectionHeader(title: "Selection")
@@ -104,7 +145,7 @@ struct SendView: View {
                 .font(.system(size: 18))
                 .foregroundStyle(.tint)
                 .frame(width: 34, height: 34)
-                .glassPanel(cornerRadius: 10)
+                .glassPanel(cornerRadius: AppRadius.control)
               VStack(alignment: .leading, spacing: 2) {
                 Text(file.name)
                   .font(.subheadline.weight(.medium))
@@ -124,7 +165,7 @@ struct SendView: View {
             }
           }
 
-          Text("\(model.selection.count) file\(model.selection.count == 1 ? "" : "s") · \(model.selectionBytes.formattedSize)")
+          Text("\(model.selection.count) · \(model.selectionBytes.formattedSize)")
             .font(.caption)
             .foregroundStyle(.secondary)
 
@@ -139,6 +180,18 @@ struct SendView: View {
     }
   }
 
+  private func selectionButton(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      VStack(spacing: 8) {
+        Image(systemName: symbol).font(.title3)
+        Text(LocalizedStringKey(title)).font(.subheadline).lineLimit(1)
+      }
+      .frame(maxWidth: .infinity, minHeight: 68)
+      .glassPanel(interactive: true)
+    }
+    .buttonStyle(.plain)
+  }
+
   private var favoritesCard: some View {
     GlassCard {
       VStack(alignment: .leading, spacing: 12) {
@@ -149,7 +202,7 @@ struct SendView: View {
               .font(.system(size: 18))
               .foregroundStyle(.yellow)
               .frame(width: 46, height: 46)
-              .glassPanel(cornerRadius: 14)
+              .glassPanel(cornerRadius: AppRadius.control)
 
             VStack(alignment: .leading, spacing: 2) {
               Text(favorite.alias)
@@ -212,7 +265,7 @@ struct SendView: View {
           .opacity(0.45)
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(16)
-          .glassPanel(cornerRadius: 12)
+          .glassPanel(cornerRadius: AppRadius.control)
         } else {
           ForEach(model.discovery.devices) { device in
             Button {
@@ -223,7 +276,7 @@ struct SendView: View {
                   .font(.system(size: 20))
                   .foregroundStyle(.tint)
                   .frame(width: 46, height: 46)
-                  .glassPanel(cornerRadius: 14)
+                  .glassPanel(cornerRadius: AppRadius.control)
 
                 VStack(alignment: .leading, spacing: 2) {
                   Text(device.alias)
@@ -244,7 +297,7 @@ struct SendView: View {
             .buttonStyle(.plain)
             .disabled(model.selection.isEmpty)
             .padding(10)
-            .glassPanel(cornerRadius: 12, interactive: true)
+            .glassPanel(cornerRadius: AppRadius.control, interactive: true)
             .contextMenu {
               Button {
                 detailsDevice = device

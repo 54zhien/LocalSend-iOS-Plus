@@ -4,12 +4,14 @@ import UIKit
 
 /// Uses UIKit's document picker so multi-file confirmation is handled by Files.
 struct FilePicker: UIViewControllerRepresentable {
+  var contentTypes: [UTType] = [.item]
+  var allowsMultipleSelection = true
   let onPick: ([URL]) -> Void
   let onCancel: () -> Void
 
   func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-    let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item], asCopy: true)
-    picker.allowsMultipleSelection = true
+    let picker = UIDocumentPickerViewController(forOpeningContentTypes: contentTypes, asCopy: true)
+    picker.allowsMultipleSelection = allowsMultipleSelection
     picker.delegate = context.coordinator
     return picker
   }

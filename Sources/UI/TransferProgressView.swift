@@ -27,7 +27,7 @@ struct TransferProgressView: View {
       Image(systemName: transfer.error == nil ? "paperplane.fill" : "exclamationmark.triangle.fill")
         .font(.system(size: 34, weight: .light))
         .frame(width: 78, height: 78)
-        .glassPanel(cornerRadius: 39)
+        .glassPanel(cornerRadius: AppRadius.control)
 
       Text(transfer.deviceAlias)
         .font(.title3.weight(.semibold))

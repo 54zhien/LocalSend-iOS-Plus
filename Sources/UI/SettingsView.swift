@@ -14,8 +14,9 @@ struct SettingsView: View {
     NavigationStack {
       ScrollView {
         VStack(spacing: 18) {
-          deviceCard
+          generalCard
           transfersCard
+          deviceCard
           discoveryCard
           aboutCard
         }
@@ -40,10 +41,30 @@ struct SettingsView: View {
     }
   }
 
+  private var generalCard: some View {
+    GlassCard {
+      VStack(alignment: .leading, spacing: 14) {
+        SectionHeader(title: "General")
+        settingsValue("Theme", "Follow system")
+        settingsValue("Color", "LocalSend")
+        settingsValue("Language", Locale.current.localizedString(forLanguageCode: Locale.current.language.languageCode?.identifier ?? "zh") ?? "简体中文")
+        Toggle("Animations", isOn: $settings.animations)
+      }
+    }
+  }
+
+  private func settingsValue(_ title: String, _ value: String) -> some View {
+    HStack {
+      Text(LocalizedStringKey(title))
+      Spacer(minLength: 12)
+      Text(value).foregroundStyle(.secondary)
+    }
+  }
+
   private var deviceCard: some View {
     GlassCard {
       VStack(alignment: .leading, spacing: 14) {
-        SectionHeader(title: "Device")
+        SectionHeader(title: "Network")
 
         HStack {
           TextField("Device name", text: $aliasDraft)
@@ -119,7 +140,7 @@ struct SettingsView: View {
   private var transfersCard: some View {
     GlassCard {
       VStack(alignment: .leading, spacing: 14) {
-        SectionHeader(title: "Transfers")
+        SectionHeader(title: "Receive")
         Picker("Quick save", selection: quickSaveMode) {
           Text("Off").tag(QuickSaveMode.off)
           Text("Always").tag(QuickSaveMode.always)

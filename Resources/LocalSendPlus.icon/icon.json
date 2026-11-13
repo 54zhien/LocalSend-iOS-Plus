@@ -1,0 +1,40 @@
+{
+  "groups": [
+    {
+      "layers": [
+        {
+          "glass": true,
+          "hidden": false,
+          "image-name": "ring.svg",
+          "name": "LocalSend outer ring",
+          "position": { "scale": 1, "translation-in-points": [0, 0] },
+          "opacity": 1,
+          "fill-specializations": [
+            { "value": { "solid": "srgb:0.00000000,0.50196078,0.50196078,1.00000000" } },
+            { "appearance": "dark", "value": { "solid": "srgb:0.51372549,0.83921569,0.78823529,1.00000000" } }
+          ]
+        },
+        {
+          "glass": true,
+          "hidden": false,
+          "image-name": "center.svg",
+          "name": "LocalSend center",
+          "position": { "scale": 1, "translation-in-points": [0, 0] },
+          "opacity": 1,
+          "fill-specializations": [
+            { "value": { "solid": "srgb:0.00000000,0.50196078,0.50196078,1.00000000" } },
+            { "appearance": "dark", "value": { "solid": "srgb:0.51372549,0.83921569,0.78823529,1.00000000" } }
+          ]
+        }
+      ],
+      "shadow": { "kind": "neutral", "opacity": 0.2 },
+      "specular": true,
+      "lighting": "individual"
+    }
+  ],
+  "supported-platforms": { "circles": ["watchOS"], "squares": "shared" },
+  "fill-specializations": [
+    { "value": "system-light" },
+    { "appearance": "dark", "value": "system-dark" }
+  ]
+}
