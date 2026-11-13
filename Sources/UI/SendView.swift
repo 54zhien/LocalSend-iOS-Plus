@@ -5,7 +5,6 @@ struct SendView: View {
 
   @State private var importerPresented = false
   @State private var favoriteSheetPresented = false
-  @State private var importError: String?
   @State private var scannerPresented = false
   @State private var detailsDevice: Device?
 
@@ -40,29 +39,14 @@ struct SendView: View {
         }
       }
       .refreshable { await model.discovery.scan() }
-      .fileImporter(
-        isPresented: $importerPresented,
-        allowedContentTypes: [.item],
-        allowsMultipleSelection: true
-      ) { result in
-        switch result {
-        case let .success(urls):
-          model.selection = urls.compactMap(SelectedFile.make(from:))
-        case let .failure(error):
-          importError = error.localizedDescription
-        }
-      }
-      .alert(
-        "Cannot add file",
-        isPresented: Binding(
-          get: { importError != nil },
-          set: { if !$0 { importError = nil } }
-        ),
-        presenting: importError
-      ) { _ in
-        Button("OK", role: .cancel) {}
-      } message: { message in
-        Text(message)
+      .sheet(isPresented: $importerPresented) {
+        FilePicker(
+          onPick: { urls in
+            model.selection = urls.compactMap(SelectedFile.make(from:))
+            importerPresented = false
+          },
+          onCancel: { importerPresented = false }
+        )
       }
       .sheet(isPresented: $favoriteSheetPresented) {
         AddFavoriteSheet { alias, host in
