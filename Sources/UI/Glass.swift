@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct AmbientBackground: View {
   var body: some View {
@@ -8,6 +9,14 @@ struct AmbientBackground: View {
 
 enum AppRadius {
   static let control: CGFloat = 16
+}
+
+extension Color {
+  static let localSendAccent = Color(uiColor: UIColor { traits in
+    traits.userInterfaceStyle == .dark
+      ? UIColor(red: 0.514, green: 0.839, blue: 0.788, alpha: 1)
+      : UIColor(red: 0, green: 0.502, blue: 0.502, alpha: 1)
+  })
 }
 
 extension View {

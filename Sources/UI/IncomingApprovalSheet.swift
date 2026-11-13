@@ -41,7 +41,7 @@ struct IncomingApprovalSheet: View {
           }
         }
         ToolbarItem(placement: .confirmationAction) {
-          Button(selected.isEmpty ? "Accept" : "Accept \(selected.count)") {
+          Button(selected.isEmpty ? String(localized: "Accept") : "\(String(localized: "Accept")) \(selected.count)") {
             onAccept()
             dismiss()
           }
@@ -60,7 +60,7 @@ struct IncomingApprovalSheet: View {
           .foregroundStyle(.tint)
         Text(request.peerAlias)
           .font(.title3.weight(.semibold))
-        Text("wants to send \(request.files.count) file\(request.files.count == 1 ? "" : "s") · \(totalSize.formattedSize)")
+        Text("\(String(localized: "Wants to send")) · \(request.files.count) · \(totalSize.formattedSize)")
           .font(.subheadline)
           .foregroundStyle(.secondary)
           .multilineTextAlignment(.center)

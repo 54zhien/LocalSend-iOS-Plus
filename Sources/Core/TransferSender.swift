@@ -12,12 +12,12 @@ enum TransferError: LocalizedError {
 
   var errorDescription: String? {
     switch self {
-    case .declined: return "The receiver declined the transfer."
-    case .pinRequired: return "The receiver requires a PIN."
-    case .tooManyAttempts: return "Too many wrong PIN attempts. Try again later."
-    case .blocked: return "The receiver is busy with another session."
-    case .noFiles: return "Select at least one file."
-    case .cancelled: return "The transfer was cancelled."
+    case .declined: return String(localized: "The receiver declined the transfer.")
+    case .pinRequired: return String(localized: "The receiver requires a PIN.")
+    case .tooManyAttempts: return String(localized: "Too many wrong PIN attempts. Try again later.")
+    case .blocked: return String(localized: "The receiver is busy with another session.")
+    case .noFiles: return String(localized: "Select at least one file.")
+    case .cancelled: return String(localized: "The transfer was cancelled.")
     case let .http(status, message): return "HTTP \(status): \(message)"
     }
   }

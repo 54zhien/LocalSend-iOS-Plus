@@ -39,8 +39,11 @@ struct TransferProgressView: View {
           .multilineTextAlignment(.center)
       } else {
         ProgressView(value: Double(transfer.completed), total: Double(max(transfer.total, 1)))
-          .tint(.accentColor)
-        Text(transfer.isFinished ? "Sent \(transfer.completed) file(s)" : "Sending \(transfer.completed) of \(transfer.total)")
+          .tint(.localSendAccent)
+        Text(transfer.isFinished ? String(localized: "Sent files") : String(localized: "Sending files"))
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+        Text("\(transfer.completed) / \(transfer.total)")
           .font(.footnote)
           .foregroundStyle(.secondary)
       }

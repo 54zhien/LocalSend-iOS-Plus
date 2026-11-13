@@ -126,7 +126,7 @@ final class ScannerViewController: UIViewController, AVCaptureMetadataOutputObje
 
     let hint = UILabel()
     hint.translatesAutoresizingMaskIntoConstraints = false
-    hint.text = "Point the camera at the other device's pairing code"
+    hint.text = String(localized: "Point the camera at the other device's pairing code")
     hint.textColor = .white
     hint.font = .preferredFont(forTextStyle: .footnote)
     hint.numberOfLines = 0

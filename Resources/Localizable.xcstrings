@@ -11401,6 +11401,46 @@
         }
       }
     },
+    "Wants to send": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请求发送"
+          }
+        }
+      }
+    },
+    "Sent files": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已发送文件"
+          }
+        }
+      }
+    },
+    "Sending files": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在发送文件"
+          }
+        }
+      }
+    },
+    "Point the camera at the other device's pairing code": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将相机对准另一台设备的配对二维码"
+          }
+        }
+      }
+    },
     "Open this address in a browser on the same network to download the received files.": {
       "localizations": {
         "zh-Hans": {
@@ -11687,6 +11727,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "保存到相册"
+          }
+        }
+      }
+    },
+    "Scan QR code": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "扫描二维码"
           }
         }
       }

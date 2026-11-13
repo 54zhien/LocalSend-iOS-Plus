@@ -28,22 +28,7 @@ struct SendView: View {
       .softTopScrollEdge()
       .background(AmbientBackground())
       .navigationTitle("Send")
-      .toolbar {
-        ToolbarItem(placement: .topBarTrailing) {
-          Button {
-            scannerPresented = true
-          } label: {
-            Image(systemName: "qrcode.viewfinder")
-          }
-        }
-        ToolbarItem(placement: .topBarTrailing) {
-          Button {
-            favoriteSheetPresented = true
-          } label: {
-            Image(systemName: "star")
-          }
-        }
-      }
+      .toolbar(.hidden, for: .navigationBar)
       .refreshable { await model.discovery.scan() }
       .sheet(isPresented: $importerPresented) {
         FilePicker(
@@ -252,6 +237,18 @@ struct SendView: View {
             Image(systemName: "arrow.triangle.2.circlepath")
           }
           .accessibilityLabel("Scan now")
+          Button { scannerPresented = true } label: {
+            Image(systemName: "qrcode.viewfinder")
+          }
+          .accessibilityLabel("Scan QR code")
+          Button { favoriteSheetPresented = true } label: {
+            Image(systemName: "heart.fill")
+          }
+          .accessibilityLabel("Add favourite")
+          NavigationLink { SettingsView(settings: model.settings) } label: {
+            Image(systemName: "gearshape.fill")
+          }
+          .accessibilityLabel("Settings")
         }
 
         if model.discovery.devices.isEmpty {
