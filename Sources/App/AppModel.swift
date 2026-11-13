@@ -95,6 +95,7 @@ final class AppModel {
     )
   )
   private var activePeerAlias = ""
+  private var activePeerFingerprint = ""
   private var started = false
 
   init() {
@@ -201,10 +202,12 @@ final class AppModel {
 
   private func handle(_ event: ServerEvent) {
     switch event {
-    case let .incoming(sessionId, peerAlias, files):
+    case let .incoming(sessionId, peerAlias, peerFingerprint, files):
       activePeerAlias = peerAlias
+      activePeerFingerprint = peerFingerprint
       let request = IncomingRequest(id: sessionId, peerAlias: peerAlias, files: files)
-      if settings.quickSave {
+      let favourite = favorites.devices.contains { $0.fingerprint == peerFingerprint }
+      if settings.quickSave || (settings.quickSaveFromFavorites && favourite) {
         accept(request)
       } else {
         incoming = request

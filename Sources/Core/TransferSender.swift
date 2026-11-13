@@ -65,8 +65,11 @@ final class LocalSendSessionDelegate: NSObject, URLSessionDelegate, URLSessionTa
     let method = challenge.protectionSpace.authenticationMethod
 
     if method == NSURLAuthenticationMethodClientCertificate {
-      if let identity = identity.identity, let certificate = identity.certificate {
-        completionHandler(.useCredential, URLCredential(identity: identity, certificates: [certificate], persistence: .forSession))
+      if let secIdentity = identity.identity, let certificate = identity.certificate {
+        completionHandler(
+          .useCredential,
+          URLCredential(identity: secIdentity, certificates: [certificate], persistence: .forSession)
+        )
       } else {
         completionHandler(.performDefaultHandling, nil)
       }
@@ -195,7 +198,7 @@ struct TransferSender {
       }
 
       uploaded += 1
-      await onProgress(uploaded, files.count)
+      onProgress(uploaded, files.count)
     }
 
     return Outcome(sessionId: prepared.sessionId, uploaded: uploaded)

@@ -5,7 +5,7 @@ import UIKit
 /// Events the app has to answer, mirroring the Flutter client's session model.
 enum ServerEvent {
   /// A sender asked to upload files. The app must call `decide` or `decline`.
-  case incoming(sessionId: String, peerAlias: String, files: [FileDTO])
+  case incoming(sessionId: String, peerAlias: String, peerFingerprint: String, files: [FileDTO])
   case received(fileName: String, url: URL)
   case peerSeen(PeerDescription)
 
@@ -255,6 +255,7 @@ final class LocalHTTPServer {
     onEvent?(.incoming(
       sessionId: sessionId,
       peerAlias: request.info.alias,
+      peerFingerprint: request.info.fingerprint,
       files: request.files.values.sorted { $0.fileName < $1.fileName }
     ))
 

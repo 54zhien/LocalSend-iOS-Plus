@@ -109,8 +109,17 @@ struct SettingsView: View {
     GlassCard {
       VStack(alignment: .leading, spacing: 14) {
         SectionHeader(title: "Transfers")
-        Toggle("Quick save (auto accept)", isOn: $settings.quickSave)
-        Text("Skip the confirmation sheet and receive files immediately.")
+        Picker("Quick save", selection: quickSaveMode) {
+          Text("Off").tag(QuickSaveMode.off)
+          Text("Always").tag(QuickSaveMode.always)
+          Text("Favourites only").tag(QuickSaveMode.favourites)
+        }
+        .pickerStyle(.segmented)
+        Text(quickSaveHint)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        Toggle("Auto finish", isOn: $settings.autoFinish)
+        Text("Leave the transfer screen as soon as the last file is written.")
           .font(.caption)
           .foregroundStyle(.secondary)
         Toggle("Save media to Photos", isOn: $settings.saveToPhotos)
@@ -181,4 +190,34 @@ struct SettingsView: View {
       }
     }
   }
+
+  /// The upstream client exposes quick save as three modes; two booleans model them here.
+  private enum QuickSaveMode: Hashable {
+    case off
+    case always
+    case favourites
+  }
+
+  private var quickSaveMode: Binding<QuickSaveMode> {
+    Binding(
+      get: {
+        if settings.quickSave { return .always }
+        if settings.quickSaveFromFavorites { return .favourites }
+        return .off
+      },
+      set: { mode in
+        settings.quickSave = mode == .always
+        settings.quickSaveFromFavorites = mode == .favourites
+      }
+    )
+  }
+
+  private var quickSaveHint: String {
+    switch quickSaveMode.wrappedValue {
+    case .off: "Every incoming transfer asks for confirmation."
+    case .always: "Incoming transfers are accepted without asking."
+    case .favourites: "Only devices you marked as favourites are accepted automatically."
+    }
+  }
 }
+

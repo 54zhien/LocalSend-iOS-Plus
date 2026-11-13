@@ -39,7 +39,7 @@ enum TLS {
 
     let pin = expectedFingerprint?.uppercased()
     sec_protocol_options_set_verify_block(protocolOptions, { _, secTrust, complete in
-      let trust = sec_trust_copy_ref(secTrust)
+      let trust = sec_trust_copy_ref(secTrust).takeRetainedValue()
       guard let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate],
         let leaf = chain.first
       else {

@@ -9,6 +9,10 @@ final class AppSettings {
   var alias: String { didSet { save() } }
   /// Accept incoming transfers without asking (the "quick save" mode of LocalSend).
   var quickSave: Bool { didSet { save() } }
+  /// Auto-accept only for devices marked as favourites (upstream "paired" quick save).
+  var quickSaveFromFavorites: Bool { didSet { save() } }
+  /// Close the receive screen as soon as the last file arrived.
+  var autoFinish: Bool { didSet { save() } }
   /// Save received images/videos to the photo library in addition to Documents.
   var saveToPhotos: Bool { didSet { save() } }
   /// Advertise the download API (`/prepare-download`), used by browsers/web clients.
@@ -25,6 +29,8 @@ final class AppSettings {
   private struct Snapshot: Codable {
     var alias: String
     var quickSave: Bool
+    var quickSaveFromFavorites: Bool?
+    var autoFinish: Bool?
     var saveToPhotos: Bool
     var downloadEnabled: Bool
     var scanInterval: Double
@@ -36,6 +42,8 @@ final class AppSettings {
       let container = try decoder.container(keyedBy: CodingKeys.self)
       alias = try container.decode(String.self, forKey: .alias)
       quickSave = try container.decode(Bool.self, forKey: .quickSave)
+      quickSaveFromFavorites = try container.decodeIfPresent(Bool.self, forKey: .quickSaveFromFavorites)
+      autoFinish = try container.decodeIfPresent(Bool.self, forKey: .autoFinish)
       saveToPhotos = try container.decode(Bool.self, forKey: .saveToPhotos)
       downloadEnabled = try container.decode(Bool.self, forKey: .downloadEnabled)
       scanInterval = try container.decode(Double.self, forKey: .scanInterval)
@@ -47,6 +55,8 @@ final class AppSettings {
     init(
       alias: String,
       quickSave: Bool,
+      quickSaveFromFavorites: Bool,
+      autoFinish: Bool,
       saveToPhotos: Bool,
       downloadEnabled: Bool,
       scanInterval: Double,
@@ -56,6 +66,8 @@ final class AppSettings {
     ) {
       self.alias = alias
       self.quickSave = quickSave
+      self.quickSaveFromFavorites = quickSaveFromFavorites
+      self.autoFinish = autoFinish
       self.saveToPhotos = saveToPhotos
       self.downloadEnabled = downloadEnabled
       self.scanInterval = scanInterval
@@ -72,6 +84,8 @@ final class AppSettings {
     {
       alias = snapshot.alias
       quickSave = snapshot.quickSave
+      quickSaveFromFavorites = snapshot.quickSaveFromFavorites ?? false
+      autoFinish = snapshot.autoFinish ?? false
       saveToPhotos = snapshot.saveToPhotos
       downloadEnabled = snapshot.downloadEnabled
       scanInterval = snapshot.scanInterval
@@ -81,6 +95,8 @@ final class AppSettings {
     } else {
       alias = UIDevice.current.name
       quickSave = true
+      quickSaveFromFavorites = false
+      autoFinish = false
       saveToPhotos = false
       downloadEnabled = false
       scanInterval = 12
@@ -94,6 +110,8 @@ final class AppSettings {
     let snapshot = Snapshot(
       alias: alias,
       quickSave: quickSave,
+      quickSaveFromFavorites: quickSaveFromFavorites,
+      autoFinish: autoFinish,
       saveToPhotos: saveToPhotos,
       downloadEnabled: downloadEnabled,
       scanInterval: scanInterval,
