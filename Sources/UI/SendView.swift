@@ -73,9 +73,12 @@ struct SendView: View {
         DeviceDetailsSheet(device: device)
       }
       .sheet(isPresented: $scannerPresented) {
-        QRScannerView { code in
-          handleScanned(code: code, model: model)
-        }
+        QRScannerView(
+          onCode: { code in
+            handleScanned(code: code, model: model)
+          },
+          onCancel: { scannerPresented = false }
+        )
         .ignoresSafeArea()
       }
     }
@@ -169,29 +172,13 @@ struct SendView: View {
             }
             .buttonStyle(.plain)
             .disabled(model.selection.isEmpty)
-            .contextMenu {
-              Button {
-                detailsDevice = device
-              } label: {
-                Label("Details", systemImage: "info.circle")
-              }
-              Button {
-                model.favorites.toggle(
-                  FavoriteDevice(
-                    fingerprint: device.fingerprint,
-                    alias: device.alias,
-                    host: device.host,
-                    port: device.port,
-                    deviceType: device.deviceType.rawValue,
-                    protocolName: device.protocolName
-                  )
-                )
-              } label: {
-                Label("Add favourite", systemImage: "star")
-              }
-            }
           }
           .contextMenu {
+            Button {
+              detailsDevice = favorite.asDevice
+            } label: {
+              Label("Details", systemImage: "info.circle")
+            }
             Button("Remove", role: .destructive) {
               model.favorites.remove(fingerprint: favorite.fingerprint)
             }
@@ -246,6 +233,27 @@ struct SendView: View {
             }
             .buttonStyle(.plain)
             .disabled(model.selection.isEmpty)
+            .contextMenu {
+              Button {
+                detailsDevice = device
+              } label: {
+                Label("Details", systemImage: "info.circle")
+              }
+              Button {
+                model.favorites.toggle(
+                  FavoriteDevice(
+                    fingerprint: device.fingerprint,
+                    alias: device.alias,
+                    host: device.host,
+                    port: device.port,
+                    deviceType: device.deviceType.rawValue,
+                    protocolName: device.protocolName
+                  )
+                )
+              } label: {
+                Label("Add favourite", systemImage: "star")
+              }
+            }
           }
         }
       }
