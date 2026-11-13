@@ -19,6 +19,11 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+      - path: Resources
+        excludes:
+          - "i18n"
+          - "Info.plist"
+          - "LocalSendNative.entitlements"
     info:
       path: Resources/Info.plist
       properties:

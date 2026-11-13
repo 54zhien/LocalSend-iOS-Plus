@@ -1,27 +1,25 @@
 #!/usr/bin/env node
-// Generates Resources/Localizable.xcstrings from the LocalSend translation files in
-// Resources/i18n. The SwiftUI views use the English text as the lookup key, so a string is
-// translated when its English value matches a value in en.json — that keeps the source
-// readable and inherits all ~57 locales the upstream project ships.
+// Builds Resources/Localizable.xcstrings from the LocalSend translation files in Resources/i18n.
 //
-// Run: node tools/gen_strings.mjs  (commit the result; CI re-runs it and fails on drift)
+// SwiftUI treats a plain string literal as a LocalizedStringKey, so the English text in the
+// views *is* the key. tools/strings.json maps each of those literals to the matching upstream
+// key; everything the upstream project already translated then comes for free.
+//
+// Run: node tools/gen_strings.mjs   (commit the result; CI re-runs and fails on drift)
 
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const I18N = 'Resources/i18n';
-const SOURCES = ['Sources', 'ShareExtension'];
 const OUT = 'Resources/Localizable.xcstrings';
+const MAP = JSON.parse(readFileSync('tools/strings.json', 'utf8'));
 
-// Apple wants script-based Chinese tags; the upstream files use region tags.
 const LOCALE_MAP = {
   'zh-CN': 'zh-Hans',
   'zh-TW': 'zh-Hant',
   'zh-HK': 'zh-Hant-HK',
   'en-IN': 'en-GB',
   'es-ES': 'es',
-  'pt-BR': 'pt-BR',
-  'pt-PT': 'pt-PT',
   'sr-Cyrl': 'sr-Cyrl',
   'fil-PH': 'fil',
 };
@@ -36,63 +34,36 @@ function flatten(value, prefix, out) {
   return out;
 }
 
-function loadLocale(file) {
-  return flatten(JSON.parse(readFileSync(join(I18N, file), 'utf8')), '', {});
-}
-
-const files = readdirSync(I18N).filter((f) => f.endsWith('.json') && !f.startsWith('_'));
-const locales = new Map(); // appleTag -> flattened table
-for (const file of files) {
+const tables = new Map();
+for (const file of readdirSync(I18N)) {
+  if (!file.endsWith('.json') || file.startsWith('_')) continue;
   const tag = file.replace(/\.json$/, '');
-  locales.set(LOCALE_MAP[tag] ?? tag, loadLocale(file));
-}
-const english = locales.get('en') ?? loadLocale('en.json');
-if (!english || Object.keys(english).length === 0) throw new Error('en.json is missing');
-
-// value -> first key that carries it
-const byValue = new Map();
-for (const [key, value] of Object.entries(english)) {
-  if (!byValue.has(value)) byValue.set(value, key);
+  tables.set(LOCALE_MAP[tag] ?? tag, flatten(JSON.parse(readFileSync(join(I18N, file), 'utf8')), '', {}));
 }
 
-function collectLiterals(dir, out) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) collectLiterals(path, out);
-    else if (entry.name.endsWith('.swift')) {
-      const body = readFileSync(path, 'utf8');
-      const pattern = /"((?:[^"\\n]|\.)*)"/g;
-      let match;
-      while ((match = pattern.exec(body)) !== null) {
-        const literal = match[1];
-        if (!literal || literal.includes('\(')) continue;
-        out.add(literal);
-      }
-    }
-  }
-  return out;
+/** Resolves slang's `@:other.key` references inside one locale. */
+function resolve(table, key, depth = 0) {
+  const raw = table[key];
+  if (typeof raw !== 'string' || depth > 4) return undefined;
+  if (!raw.startsWith('@:')) return raw;
+  return resolve(table, raw.slice(2), depth + 1);
 }
-
-const literals = new Set();
-for (const dir of SOURCES) collectLiterals(dir, literals);
 
 const strings = {};
-let matched = 0;
-for (const literal of [...literals].sort()) {
-  const key = byValue.get(literal);
-  if (!key) continue;
-  matched += 1;
+let localized = 0;
+for (const [literal, key] of Object.entries(MAP)) {
+  if (literal.startsWith('_')) continue;
   const localizations = {};
-  for (const [tag, table] of locales) {
+  for (const [tag, table] of tables) {
     if (tag === 'en') continue;
-    const value = table[key];
-    if (typeof value === 'string' && value && value !== literal) {
+    const value = resolve(table, key);
+    if (value && value !== literal) {
       localizations[tag] = { stringUnit: { state: 'translated', value } };
     }
   }
-  strings[literal] = Object.keys(localizations).length > 0 ? { localizations } : {};
+  if (Object.keys(localizations).length > 0) localized += 1;
+  strings[literal] = { localizations };
 }
 
-const catalog = { sourceLanguage: 'en', strings, version: '1.0' };
-writeFileSync(OUT, JSON.stringify(catalog, null, 2) + '\n');
-console.log(`literals=${literals.size} matched=${matched} locales=${locales.size} -> ${OUT}`);
+writeFileSync(OUT, JSON.stringify({ sourceLanguage: 'en', strings, version: '1.0' }, null, 2) + '\n');
+console.log(`entries=${Object.keys(strings).length} localized=${localized} locales=${tables.size}`);

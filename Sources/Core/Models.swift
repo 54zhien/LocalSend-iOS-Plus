@@ -71,7 +71,7 @@ struct MulticastAnnounce: Codable {
   }
 }
 
-struct FileDTO: Codable, Equatable {
+struct FileDTO: Codable, Equatable, Identifiable {
   var id: String
   var fileName: String
   var size: Int

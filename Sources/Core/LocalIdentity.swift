@@ -154,11 +154,9 @@ final class LocalIdentity {
     let certificate = value as! SecCertificate
     let der = SecCertificateCopyData(certificate) as Data
 
-    var identity: SecIdentity?
-    SecIdentityCreateWithCertificate(nil, certificate, &identity)
     return LocalIdentity(
       certificate: certificate,
-      identity: identity,
+      identity: LocalIdentity.keychainIdentity(for: keyTag),
       fingerprint: Hex.sha256(der)
     )
   }
@@ -212,14 +210,13 @@ final class LocalIdentity {
 
     let certQuery: [String: Any] = [
       kSecClass as String: kSecClassCertificate,
-      kSecAttrApplicationTag as String: certTag,
+      kSecAttrApplicationTag as String: keyTag,
       kSecValueRef as String: certificate,
     ]
     SecItemDelete(certQuery as CFDictionary)
     SecItemAdd(certQuery as CFDictionary, nil)
 
-    var identity: SecIdentity?
-    SecIdentityCreateWithCertificate(nil, certificate, &identity)
+    let identity = LocalIdentity.keychainIdentity(for: keyTag)
 
     return LocalIdentity(
       certificate: certificate,
@@ -258,4 +255,22 @@ final class LocalIdentity {
     }
     return key
   }
+
+  /// iOS has no SecIdentityCreateWithCertificate; a keychain query pairs the certificate
+  /// and its private key when both were stored under the same application tag.
+  static func keychainIdentity(for tag: Data) -> SecIdentity? {
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassIdentity,
+      kSecAttrApplicationTag as String: tag,
+      kSecReturnRef as String: true,
+      kSecMatchLimit as String: kSecMatchLimitOne,
+    ]
+    var item: CFTypeRef?
+    guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess, let item else {
+      return nil
+    }
+    guard CFGetTypeID(item) == SecIdentityGetTypeID() else { return nil }
+    return (item as! SecIdentity)
+  }
 }
+
