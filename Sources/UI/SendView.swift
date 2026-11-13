@@ -18,8 +18,9 @@ struct SendView: View {
           if !model.favorites.devices.isEmpty { favoritesCard }
           devicesCard
         }
-        .padding(20)
+        .padding(15)
       }
+      .softTopScrollEdge()
       .background(AmbientBackground())
       .navigationTitle("Send")
       .toolbar {
@@ -68,23 +69,35 @@ struct SendView: View {
     }
   }
 
+  @ViewBuilder
   private func selectionCard(model: AppModel) -> some View {
-    GlassCard {
-      VStack(alignment: .leading, spacing: 12) {
+    if model.selection.isEmpty {
+      VStack(alignment: .leading, spacing: 10) {
+        SectionHeader(title: "Selection")
+        Button {
+          importerPresented = true
+        } label: {
+          VStack(spacing: 5) {
+            Image(systemName: "doc.badge.plus")
+              .font(.title3)
+            Text("Add files")
+              .font(.caption)
+          }
+          .frame(width: 90, height: 65)
+          .glassPanel(cornerRadius: 10, interactive: true)
+        }
+        .buttonStyle(.plain)
+      }
+    } else {
+      GlassCard(cornerRadius: 16) {
+        VStack(alignment: .leading, spacing: 12) {
         HStack {
           SectionHeader(title: "Selection")
           Spacer(minLength: 0)
-          if !model.selection.isEmpty {
-            Button("Clear") { model.selection = [] }
-              .font(.footnote)
-          }
+          Button("Clear") { model.selection = [] }
+            .font(.footnote)
         }
 
-        if model.selection.isEmpty {
-          Text("Pick files or photos to send, or share into LocalSend from another app.")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        } else {
           ForEach(model.selection) { file in
             HStack(spacing: 12) {
               Image(systemName: "doc.fill")
@@ -114,7 +127,6 @@ struct SendView: View {
           Text("\(model.selection.count) file\(model.selection.count == 1 ? "" : "s") · \(model.selectionBytes.formattedSize)")
             .font(.caption)
             .foregroundStyle(.secondary)
-        }
 
         Button {
           importerPresented = true
@@ -122,6 +134,7 @@ struct SendView: View {
           Label("Add files", systemImage: "plus")
         }
         .buttonStyle(GlassProminentButtonStyle())
+        }
       }
     }
   }
@@ -173,20 +186,33 @@ struct SendView: View {
   }
 
   private var devicesCard: some View {
-    GlassCard {
-      VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: 12) {
         HStack {
           SectionHeader(title: "Nearby")
           Spacer(minLength: 0)
           if model.discovery.isScanning {
             ProgressView().controlSize(.small)
           }
+          Button {
+            Task { await model.discovery.scan() }
+          } label: {
+            Image(systemName: "arrow.triangle.2.circlepath")
+          }
+          .accessibilityLabel("Scan now")
         }
 
         if model.discovery.devices.isEmpty {
-          Text(model.discovery.isScanning ? "Scanning the local network…" : "No device found yet. Pull to rescan.")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
+          HStack(spacing: 12) {
+            Image(systemName: "desktopcomputer")
+              .font(.title2)
+            Text(model.discovery.isScanning ? "Scanning the local network…" : "No device found yet. Pull to rescan.")
+              .font(.subheadline)
+          }
+          .foregroundStyle(.secondary)
+          .opacity(0.45)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(16)
+          .glassPanel(cornerRadius: 12)
         } else {
           ForEach(model.discovery.devices) { device in
             Button {
@@ -217,6 +243,8 @@ struct SendView: View {
             }
             .buttonStyle(.plain)
             .disabled(model.selection.isEmpty)
+            .padding(10)
+            .glassPanel(cornerRadius: 12, interactive: true)
             .contextMenu {
               Button {
                 detailsDevice = device
@@ -240,7 +268,6 @@ struct SendView: View {
             }
           }
         }
-      }
     }
   }
 

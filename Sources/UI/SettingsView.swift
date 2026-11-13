@@ -21,6 +21,7 @@ struct SettingsView: View {
         }
         .padding(20)
       }
+      .softTopScrollEdge()
       .background(AmbientBackground())
       .navigationTitle("Settings")
       .fileImporter(

@@ -2,7 +2,11 @@ import SwiftUI
 
 struct ReceiveView: View {
   @Environment(AppModel.self) private var model
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var showQR = false
+  @State private var showAdvanced = false
+  @State private var spinning = false
+  @State private var appeared = false
 
   private var pairingURL: URL {
     let scheme = model.settings.encryption ? "https" : "http"
@@ -11,17 +15,33 @@ struct ReceiveView: View {
 
   var body: some View {
     NavigationStack {
-      ScrollView {
-        VStack(spacing: 18) {
-          hero
-          serverCard
-          if model.settings.downloadEnabled { downloadCard }
-          receivedCard
+      GeometryReader { geometry in
+        ScrollView {
+          VStack(spacing: 0) {
+            Spacer(minLength: 40)
+            hero
+            Spacer(minLength: 40)
+            Button {
+              showQR = true
+            } label: {
+              Label("Pairing code", systemImage: "qrcode")
+            }
+            .buttonStyle(.bordered)
+            .padding(.bottom, 24)
+
+            if model.settings.downloadEnabled { downloadCard.padding(.bottom, 16) }
+            if !model.receivedFiles.isEmpty { receivedCard }
+          }
+          .frame(maxWidth: 560)
+          .frame(maxWidth: .infinity)
+          .frame(minHeight: geometry.size.height)
+          .padding(.horizontal, 20)
         }
-        .padding(20)
+        .softTopScrollEdge()
       }
       .background(AmbientBackground())
       .navigationTitle("Receive")
+      .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .topBarTrailing) {
           NavigationLink {
@@ -30,6 +50,23 @@ struct ReceiveView: View {
             Image(systemName: "clock.arrow.circlepath")
           }
         }
+        ToolbarItem(placement: .topBarTrailing) {
+          Button {
+            withAnimation(.easeInOut(duration: 0.2)) { showAdvanced.toggle() }
+          } label: {
+            Image(systemName: "info.circle")
+          }
+        }
+      }
+      .overlay(alignment: .topTrailing) {
+        if showAdvanced {
+          serverCard
+            .frame(maxWidth: 310)
+            .padding(.top, 8)
+            .padding(.trailing, 16)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+            .zIndex(1)
+        }
       }
       .refreshable { model.refreshIdentity() }
       .sheet(isPresented: $showQR) {
@@ -37,38 +74,48 @@ struct ReceiveView: View {
           .presentationDetents([.height(440)])
           .presentationDragIndicator(.visible)
       }
+      .onAppear {
+        appeared = true
+        spinning = model.serverRunning && !reduceMotion
+      }
+      .onDisappear { spinning = false }
+      .onChange(of: model.serverRunning) { _, running in
+        spinning = running && !reduceMotion
+      }
     }
   }
 
   private var hero: some View {
-    GlassCard {
-      VStack(spacing: 12) {
-        Image(systemName: "wifi")
-          .font(.system(size: 40, weight: .regular))
-          .foregroundStyle(.tint)
-          .frame(width: 104, height: 104)
-          .glassPanel(cornerRadius: 52, interactive: true)
+    VStack(spacing: 12) {
+      Image("LocalSendLogo")
+        .resizable()
+        .renderingMode(.template)
+        .foregroundStyle(.tint)
+        .frame(width: 200, height: 200)
+        .rotationEffect(.degrees(spinning ? 360 : 0))
+        .animation(.linear(duration: 15).repeatForever(autoreverses: false), value: spinning)
+        .opacity(appeared ? 1 : 0)
+        .animation(.easeOut(duration: 0.3).delay(0.2), value: appeared)
 
-        Text(model.deviceIdentity.alias)
-          .font(.system(size: 30, weight: .semibold, design: .rounded))
-          .multilineTextAlignment(.center)
+      Text(model.deviceIdentity.alias)
+        .font(.system(size: 48, weight: .regular))
+        .minimumScaleFactor(0.55)
+        .lineLimit(1)
+        .multilineTextAlignment(.center)
 
-        Text("\(model.primaryAddress):\(String(model.deviceIdentity.port))")
-          .font(.system(.subheadline, design: .monospaced))
-          .foregroundStyle(.secondary)
-          .textSelection(.enabled)
-
-        Button {
-          showQR = true
-        } label: {
-          Label("Pairing code", systemImage: "qrcode")
-        }
-        .buttonStyle(.bordered)
-        .font(.footnote.weight(.semibold))
-      }
-      .frame(maxWidth: .infinity)
-      .padding(.vertical, 6)
+      Text(visualIDs)
+        .font(.system(size: 24))
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
+        .opacity(appeared ? 1 : 0)
+        .animation(.easeOut(duration: 0.3).delay(0.5), value: appeared)
     }
+    .frame(maxWidth: .infinity)
+  }
+
+  private var visualIDs: String {
+    guard model.serverRunning else { return String(localized: "Offline") }
+    return model.addresses.map { "#\($0.split(separator: ".").last ?? "")" }.joined(separator: " ")
   }
 
   private var serverCard: some View {

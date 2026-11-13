@@ -44,6 +44,7 @@ struct HistoryView: View {
       }
       .padding(20)
     }
+    .softTopScrollEdge()
     .background(AmbientBackground())
     .navigationTitle("History")
     .navigationBarTitleDisplayMode(.inline)

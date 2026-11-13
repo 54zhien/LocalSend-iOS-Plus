@@ -4,6 +4,7 @@
   "Send": "sendTab.title",
   "Settings": "settingsTab.title",
   "History": "receiveHistoryPage.title",
+  "Offline": "general.offline",
   "Selection": "sendTab.selection.title",
   "Nearby": "sendTab.nearbyDevices",
   "Favourites": "receiveTab.quickSave.favorites",

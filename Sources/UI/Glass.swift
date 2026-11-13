@@ -30,6 +30,15 @@ struct AmbientBackground: View {
 }
 
 extension View {
+  @ViewBuilder
+  func softTopScrollEdge() -> some View {
+    if #available(iOS 26.0, *) {
+      self.scrollEdgeEffectStyle(.soft, for: .top)
+    } else {
+      self
+    }
+  }
+
   /// Liquid Glass on iOS 26+, thin material before that.
   @ViewBuilder
   func glassPanel(cornerRadius: CGFloat = 26, interactive: Bool = false) -> some View {
@@ -80,10 +89,8 @@ struct SectionHeader: View {
   let title: String
 
   var body: some View {
-    Text(title.uppercased())
-      .font(.footnote.weight(.semibold))
-      .foregroundStyle(.secondary)
-      .padding(.horizontal, 8)
+    Text(title)
+      .font(.headline)
       .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
