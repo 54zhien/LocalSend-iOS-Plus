@@ -221,7 +221,7 @@ final class AppModel {
     server.downloadProvider = settings.downloadEnabled ? { [downloadBox] in downloadBox.value } : nil
     server.identityProvider = { [infoBox] in infoBox.value }
     let destinationBox = destination.box
-    server.destinationProvider = { destinationBox.value }
+    server.destinationProvider = { destinationBox.value ?? LocalHTTPServer.downloadsDirectory() }
     server.onEvent = { [weak self] event in
       Task { @MainActor [weak self] in
         self?.handle(event)
