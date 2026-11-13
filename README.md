@@ -1,4 +1,4 @@
-# LocalSend Plus
+# LocalSend+
 
 A native SwiftUI iOS client for [LocalSend](https://github.com/localsend/localsend), built around the
 iOS 26 Liquid Glass material (`glassEffect`, with an `ultraThinMaterial` fallback for older SDKs).
