@@ -9,28 +9,33 @@ struct SettingsView: View {
   @State private var aliasDraft = ""
   @State private var pinDraft = ""
   @State private var portDraft = ""
+  @State private var pinEditing = false
+  @State private var showingLanguages = false
 
   var body: some View {
     NavigationStack {
       ScrollView {
         VStack(spacing: 18) {
-          generalCard
-          transfersCard
-          deviceCard
-          discoveryCard
-          aboutCard
+          settingsSection("General") { generalCard }
+          settingsSection("Receive") { transfersCard }
+          if settings.advanced { settingsSection("Send") { sendCard } }
+          settingsSection("Network") { deviceCard }
+          settingsSection("Other") { aboutCard }
+          toggleRow("Advanced settings", isOn: $settings.advanced)
+            .padding(.horizontal, 12)
           VStack(spacing: 10) {
             Image("LocalSendLogo")
               .resizable()
               .renderingMode(.template)
               .foregroundStyle(.tint)
-              .frame(width: 120, height: 120)
+              .frame(width: 140, height: 140)
             Text("LocalSend").font(.largeTitle.weight(.semibold))
           }
           .frame(maxWidth: .infinity)
           .padding(.vertical, 45)
         }
-        .padding(20)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 24)
       }
       .softTopScrollEdge()
       .background(AmbientBackground())
@@ -47,100 +52,177 @@ struct SettingsView: View {
       .onAppear {
         aliasDraft = settings.alias
         pinDraft = settings.pin
+        pinEditing = !settings.pin.isEmpty
         portDraft = String(settings.port)
       }
+      .sheet(isPresented: $showingLanguages) {
+        LanguagePickerView(settings: settings)
+      }
+    }
+  }
+
+  private func settingsSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+    VStack(alignment: .leading, spacing: 12) {
+      SectionHeader(title: title)
+        .padding(.horizontal, 12)
+      content()
     }
   }
 
   private var generalCard: some View {
     GlassCard {
-      VStack(alignment: .leading, spacing: 14) {
-        SectionHeader(title: "General")
-        settingsValue("Theme", "Follow system")
-        settingsValue("Color", "LocalSend")
-        settingsValue("Language", Locale.current.localizedString(forLanguageCode: Locale.current.language.languageCode?.identifier ?? "zh") ?? "简体中文")
-        Toggle("Animations", isOn: $settings.animations)
+      VStack(alignment: .leading, spacing: 16) {
+        HStack(spacing: 12) {
+          Text("Theme").frame(maxWidth: .infinity, alignment: .leading)
+          Picker("Theme", selection: $settings.brightness) {
+            Text("Follow system").tag(AppBrightness.system)
+            Text("Light").tag(AppBrightness.light)
+            Text("Dark").tag(AppBrightness.dark)
+          }
+          .labelsHidden()
+          .pickerStyle(.menu)
+          .frame(width: 146, height: 46)
+          .materialControl()
+        }
+        HStack(spacing: 12) {
+          Text("Color").frame(maxWidth: .infinity, alignment: .leading)
+          Picker("Color", selection: $settings.colorMode) {
+            Text("LocalSend").tag(AppColorMode.localsend)
+            Text("OLED").tag(AppColorMode.oled)
+            Text("Yaru").tag(AppColorMode.yaru)
+            Text("Custom").tag(AppColorMode.custom)
+          }
+          .labelsHidden()
+          .pickerStyle(.menu)
+          .frame(width: 146, height: 46)
+          .materialControl()
+        }
+        if settings.colorMode == .custom {
+          HStack(spacing: 12) {
+            Text("Custom color").frame(maxWidth: .infinity, alignment: .leading)
+            ColorPicker("Custom color", selection: Binding(
+              get: { Color(hexRGB: settings.customColorHex) },
+              set: { settings.customColorHex = $0.hexRGB }
+            ))
+            .labelsHidden()
+            .frame(width: 146, height: 46)
+            .materialControl()
+          }
+        }
+        HStack(spacing: 12) {
+          Text("Language").frame(maxWidth: .infinity, alignment: .leading)
+          Button {
+            showingLanguages = true
+          } label: {
+            Group {
+              if settings.languageCode == "system" {
+                Text("Follow system")
+              } else {
+                Text(Locale(identifier: settings.languageCode).localizedString(forIdentifier: settings.languageCode) ?? settings.languageCode)
+              }
+            }
+              .lineLimit(1)
+              .minimumScaleFactor(0.75)
+              .frame(width: 146, height: 46)
+              .materialControl()
+          }
+          .buttonStyle(.plain)
+        }
+        toggleRow("Animations", isOn: $settings.animations)
       }
     }
   }
 
   private func settingsValue(_ title: String, _ value: String) -> some View {
-    HStack {
+    HStack(spacing: 12) {
       Text(LocalizedStringKey(title))
-      Spacer(minLength: 12)
-      Text(LocalizedStringKey(value)).foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      Text(LocalizedStringKey(value))
+        .lineLimit(1)
+        .minimumScaleFactor(0.75)
+        .frame(width: 146)
+        .frame(minHeight: 46)
+        .materialControl()
     }
+    .font(.subheadline)
+  }
+
+  private func toggleRow(_ title: String, isOn: Binding<Bool>) -> some View {
+    HStack(spacing: 12) {
+      Text(LocalizedStringKey(title))
+        .frame(maxWidth: .infinity, alignment: .leading)
+      Toggle(LocalizedStringKey(title), isOn: isOn)
+        .labelsHidden()
+        .frame(width: 146, height: 46)
+        .materialControl()
+    }
+    .font(.subheadline)
   }
 
   private var deviceCard: some View {
     GlassCard {
-      VStack(alignment: .leading, spacing: 14) {
-        SectionHeader(title: "Network")
+      VStack(alignment: .leading, spacing: 16) {
+        settingsValue("Server", model.serverRunning ? "Running" : "Stopped")
 
-        HStack {
-          TextField("Device name", text: $aliasDraft)
-            .textFieldStyle(.plain)
-            .padding(12)
-            .glassPanel()
-            .submitLabel(.done)
-            .onSubmit {
-              model.updateAlias(aliasDraft)
-              aliasDraft = model.settings.alias
-            }
-          Button("Save") {
-            model.updateAlias(aliasDraft)
-            aliasDraft = model.settings.alias
+        HStack(spacing: 12) {
+          Text("Device name")
+            .font(.subheadline)
+            .frame(maxWidth: .infinity, alignment: .leading)
+          HStack(spacing: 4) {
+            TextField("Device name", text: $aliasDraft)
+              .textFieldStyle(.plain)
+              .submitLabel(.done)
+              .onSubmit { applyAlias() }
+            Button { applyAlias() } label: { Image(systemName: "checkmark") }
+              .disabled(aliasDraft == settings.alias)
           }
-          .font(.footnote.weight(.semibold))
-          .disabled(aliasDraft == settings.alias)
+          .padding(12)
+          .frame(width: 146)
+          .materialControl()
         }
 
-        Toggle("Encryption (HTTPS + mTLS)", isOn: $settings.encryption)
+        settingsValue("Device type", "iPhone")
+        settingsValue("Device model", model.deviceIdentity.deviceModel)
+
+        HStack(spacing: 12) {
+          Text("Port")
+            .font(.subheadline)
+            .frame(maxWidth: .infinity, alignment: .leading)
+          HStack(spacing: 4) {
+            TextField("Port", text: $portDraft)
+              .textFieldStyle(.plain)
+              .keyboardType(.numberPad)
+              .multilineTextAlignment(.center)
+            Button { applyPort() } label: { Image(systemName: "checkmark") }
+              .disabled(portDraft == String(settings.port))
+          }
+          .padding(12)
+          .frame(width: 146)
+          .materialControl()
+        }
+
+        HStack(spacing: 12) {
+          Text("Scan interval")
+            .font(.subheadline)
+            .frame(maxWidth: .infinity, alignment: .leading)
+          Picker("Scan interval", selection: $settings.scanInterval) {
+            ForEach(Array(stride(from: 4, through: 60, by: 4)), id: \.self) { seconds in
+              Text("\(seconds) s").tag(Double(seconds))
+            }
+          }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(width: 146, height: 46)
+            .materialControl()
+            .onChange(of: settings.scanInterval) {
+              model.discovery.restart(interval: settings.scanInterval)
+            }
+        }
+
+        toggleRow("Encryption", isOn: $settings.encryption)
           .onChange(of: settings.encryption) { _, _ in
             model.applyNetworkSettings()
           }
-        Toggle("Require PIN", isOn: Binding(
-          get: { !settings.pin.isEmpty },
-          set: { enabled in
-            if !enabled {
-              settings.pin = ""
-              pinDraft = ""
-              model.applyNetworkSettings()
-            }
-          }
-        ))
-
-        HStack {
-          TextField("PIN (empty turns it off)", text: $pinDraft)
-            .textFieldStyle(.plain)
-            .padding(12)
-            .glassPanel()
-            .keyboardType(.numberPad)
-          Button("Save") {
-            settings.pin = pinDraft
-            model.applyNetworkSettings()
-          }
-          .font(.footnote.weight(.semibold))
-          .disabled(pinDraft == settings.pin)
-        }
-
-        HStack {
-          TextField("Port", text: $portDraft)
-            .textFieldStyle(.plain)
-            .padding(12)
-            .glassPanel()
-            .keyboardType(.numberPad)
-            .frame(maxWidth: 120)
-          Button("Apply") {
-            if let port = Int(portDraft), (1024...65535).contains(port) {
-              settings.port = port
-              model.applyNetworkSettings()
-            } else {
-              portDraft = String(settings.port)
-            }
-          }
-          .font(.footnote.weight(.semibold))
-        }
 
         VStack(alignment: .leading, spacing: 4) {
           Text("Fingerprint")
@@ -150,44 +232,93 @@ struct SettingsView: View {
             .font(.system(.caption2, design: .monospaced))
             .textSelection(.enabled)
         }
+        Button {
+          Task { await model.discovery.scan() }
+        } label: {
+          Label("Scan now", systemImage: "arrow.triangle.2.circlepath")
+        }
+        .buttonStyle(GlassProminentButtonStyle())
       }
     }
   }
 
+  private func applyPort() {
+    guard let port = Int(portDraft), (1024...65535).contains(port) else {
+      portDraft = String(settings.port)
+      return
+    }
+    settings.port = port
+    model.applyNetworkSettings()
+  }
+
+  private func applyAlias() {
+    model.updateAlias(aliasDraft)
+    aliasDraft = settings.alias
+  }
+
   private var transfersCard: some View {
     GlassCard {
-      VStack(alignment: .leading, spacing: 14) {
-        SectionHeader(title: "Receive")
-        Picker("Quick save", selection: quickSaveMode) {
-          Text("Off").tag(QuickSaveMode.off)
-          Text("Always").tag(QuickSaveMode.always)
-          Text("Favourites only").tag(QuickSaveMode.favourites)
-        }
-        .pickerStyle(.segmented)
-        Text(LocalizedStringKey(quickSaveHint))
-          .font(.caption)
-          .foregroundStyle(.secondary)
-        Toggle("Auto finish", isOn: $settings.autoFinish)
-        Text("Leave the transfer screen as soon as the last file is written.")
-          .font(.caption)
-          .foregroundStyle(.secondary)
-        HStack {
-          VStack(alignment: .leading, spacing: 2) {
-            Text("Receive folder")
-            Text(model.destination.displayName ?? String(localized: "Default: Documents/LocalSend Plus"))
-              .font(.caption)
-              .foregroundStyle(.secondary)
+      VStack(alignment: .leading, spacing: 16) {
+        toggleRow("Quick save", isOn: $settings.quickSave)
+        toggleRow("Auto save from favourites", isOn: $settings.quickSaveFromFavorites)
+        toggleRow("Require PIN", isOn: Binding(
+          get: { pinEditing },
+          set: { enabled in
+            pinEditing = enabled
+            if enabled {
+              pinDraft = settings.pin
+            } else {
+              settings.pin = ""
+              pinDraft = ""
+              model.applyNetworkSettings()
+            }
           }
-          Spacer(minLength: 12)
-          Button("Choose") { choosingFolder = true }
-            .buttonStyle(.borderless)
-          if model.destination.folderURL != nil {
-            Button("Reset") { model.destination.clear() }
-              .buttonStyle(.borderless)
+        ))
+        if pinEditing {
+          HStack(spacing: 12) {
+            Text("PIN")
+              .font(.subheadline)
+              .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 4) {
+              TextField("PIN", text: $pinDraft)
+                .keyboardType(.numberPad)
+                .textFieldStyle(.plain)
+              Button { applyPin() } label: { Image(systemName: "checkmark") }
+                .disabled(pinDraft == settings.pin)
+            }
+            .padding(12)
+            .frame(width: 146)
+            .materialControl()
           }
         }
-        Toggle("Save media to Photos", isOn: $settings.saveToPhotos)
-        Toggle("Web download page", isOn: $settings.downloadEnabled)
+        toggleRow("Save media to Photos", isOn: $settings.saveToPhotos)
+        toggleRow("Auto finish", isOn: $settings.autoFinish)
+        HStack(spacing: 12) {
+          Text("Receive folder")
+            .font(.subheadline)
+            .frame(maxWidth: .infinity, alignment: .leading)
+          Button(model.destination.displayName ?? String(localized: "Choose")) { choosingFolder = true }
+            .font(.subheadline)
+            .lineLimit(1)
+            .frame(width: 146, height: 46)
+            .materialControl()
+        }
+      }
+    }
+  }
+
+  private func applyPin() {
+    let value = pinDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !value.isEmpty else { return }
+    settings.pin = value
+    pinDraft = value
+    model.applyNetworkSettings()
+  }
+
+  private var sendCard: some View {
+    GlassCard {
+      VStack(alignment: .leading, spacing: 16) {
+        toggleRow("Web download page", isOn: $settings.downloadEnabled)
           .onChange(of: settings.downloadEnabled) {
             model.applyNetworkSettings()
           }
@@ -195,44 +326,9 @@ struct SettingsView: View {
     }
   }
 
-  private var discoveryCard: some View {
-    GlassCard {
-      VStack(alignment: .leading, spacing: 14) {
-        SectionHeader(title: "Discovery")
-        Stepper(
-          "Scan every \(Int(settings.scanInterval))s",
-          value: $settings.scanInterval,
-          in: 4...60,
-          step: 4
-        )
-        .onChange(of: settings.scanInterval) {
-          model.discovery.restart(interval: settings.scanInterval)
-        }
-
-        HStack {
-          Button {
-            Task { await model.discovery.scan() }
-          } label: {
-            Label("Scan now", systemImage: "arrow.triangle.2.circlepath")
-          }
-          .buttonStyle(GlassProminentButtonStyle())
-
-          Spacer(minLength: 0)
-
-          if let last = model.discovery.lastScan {
-            Text(last.formatted(date: .omitted, time: .shortened))
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
-        }
-      }
-    }
-  }
-
   private var aboutCard: some View {
     GlassCard {
       VStack(alignment: .leading, spacing: 10) {
-        SectionHeader(title: "Other")
         HStack {
           Text("App")
           Spacer()
@@ -258,33 +354,5 @@ struct SettingsView: View {
     }
   }
 
-  /// The upstream client exposes quick save as three modes; two booleans model them here.
-  private enum QuickSaveMode: Hashable {
-    case off
-    case always
-    case favourites
-  }
-
-  private var quickSaveMode: Binding<QuickSaveMode> {
-    Binding(
-      get: {
-        if settings.quickSave { return .always }
-        if settings.quickSaveFromFavorites { return .favourites }
-        return .off
-      },
-      set: { mode in
-        settings.quickSave = mode == .always
-        settings.quickSaveFromFavorites = mode == .favourites
-      }
-    )
-  }
-
-  private var quickSaveHint: String {
-    switch quickSaveMode.wrappedValue {
-    case .off: "Every incoming transfer asks for confirmation."
-    case .always: "Incoming transfers are accepted without asking."
-    case .favourites: "Only devices you marked as favourites are accepted automatically."
-    }
-  }
 }
 

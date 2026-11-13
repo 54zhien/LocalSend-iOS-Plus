@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LocalSend · 分享文件</title>
+  <style>
+    :root { color-scheme: light dark; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    body { max-width: 520px; margin: 0 auto; padding: 48px 20px; background: Canvas; color: CanvasText; }
+    h1 { font-size: 2rem; margin: 0 0 12px; }
+    p { color: GrayText; line-height: 1.5; }
+    ul { list-style: none; padding: 0; }
+    li { margin: 12px 0; }
+    a { display: block; padding: 16px; border-radius: 22px; background: #008f89; color: white; text-decoration: none; overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <h1 id="title">共享的文件</h1>
+  <p id="status">正在加载…</p>
+  <ul id="files"></ul>
+  <script>
+    const english = !navigator.language.toLowerCase().startsWith('zh');
+    const words = english
+      ? { title: 'Shared files', loading: 'Loading…', empty: 'No files are shared.', failed: 'Could not load files.' }
+      : { title: '共享的文件', loading: '正在加载…', empty: '没有共享的文件。', failed: '无法加载文件。' };
+    document.getElementById('title').textContent = words.title;
+    const status = document.getElementById('status');
+    status.textContent = words.loading;
+    (async () => {
+      try {
+        const [filesResponse, sessionResponse] = await Promise.all([
+          fetch('/web/files'),
+          fetch('/api/localsend/v2/prepare-download', { method: 'POST' })
+        ]);
+        if (!filesResponse.ok || !sessionResponse.ok) throw new Error();
+        const files = await filesResponse.json();
+        const session = await sessionResponse.json();
+        status.textContent = files.length ? '' : words.empty;
+        const list = document.getElementById('files');
+        for (const file of files) {
+          const token = session.files[file.id];
+          if (!token) continue;
+          const query = new URLSearchParams({ sessionId: session.sessionId, fileId: file.id, token });
+          const item = document.createElement('li');
+          const link = document.createElement('a');
+          link.href = `/api/localsend/v2/download?${query}`;
+          link.download = file.fileName;
+          link.textContent = file.fileName;
+          item.append(link);
+          list.append(item);
+        }
+      } catch { status.textContent = words.failed; }
+    })();
+  </script>
+</body>
+</html>

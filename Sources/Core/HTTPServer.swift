@@ -55,7 +55,9 @@ final class LocalHTTPServer {
   var pin: String?
   /// `nil` disables the web download API; otherwise the files offered to browsers.
   var downloadProvider: (() -> [FileDTO])?
+  var downloadURLProvider: ((FileDTO) -> URL?)?
   var webUploadEnabled = false
+  var webSendEnabled = false
   /// Where received files are written; falls back to `Documents/LocalSend`.
   var destinationProvider: (() -> URL)?
   var onEvent: ((ServerEvent) -> Void)?
@@ -161,6 +163,13 @@ final class LocalHTTPServer {
     switch (method, pathOnly) {
     case ("GET", "/"), ("GET", "/index.html"):
       handleDownloadPage(connection: connection)
+
+    case ("GET", "/web/files"):
+      if webSendEnabled, let files = downloadProvider?() {
+        connection.respondJSON(status: 200, value: files)
+      } else {
+        connection.respondJSON(status: 404, value: ["message": "not found"])
+      }
 
     case ("GET", "/api/localsend/v2/info"), ("GET", "/api/localsend/v1/info"):
       connection.respondJSON(status: 200, value: identityProvider())
@@ -356,6 +365,13 @@ final class LocalHTTPServer {
   }
 
   private func handleDownloadPage(connection: HTTPConnection) {
+    if webSendEnabled,
+      let url = Bundle.main.url(forResource: "web-download", withExtension: "html"),
+      let body = try? Data(contentsOf: url)
+    {
+      connection.respond(status: 200, body: body, contentType: "text/html; charset=utf-8")
+      return
+    }
     if webUploadEnabled,
       let url = Bundle.main.url(forResource: "web-upload", withExtension: "html"),
       let body = try? Data(contentsOf: url)
@@ -371,6 +387,7 @@ final class LocalHTTPServer {
   }
 
   private func downloadURL(for file: FileDTO) -> URL? {
+    if let url = downloadURLProvider?(file) { return url }
     let directory = Self.downloadsDirectory()
     let candidate = directory.appendingPathComponent(file.fileName)
     return FileManager.default.fileExists(atPath: candidate.path) ? candidate : nil

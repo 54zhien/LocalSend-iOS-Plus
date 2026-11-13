@@ -28,7 +28,9 @@ struct RootView: View {
       SettingsView(settings: model.settings)
         .tabItem { Label("Settings", systemImage: "gearshape.fill") }
     }
-    .tint(.localSendAccent)
+    .tint(model.settings.accentColor)
+    .preferredColorScheme(model.settings.preferredColorScheme)
+    .environment(\.locale, model.settings.selectedLocale)
     .background(AmbientBackground())
     .task {
       model.start()

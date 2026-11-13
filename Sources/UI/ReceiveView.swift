@@ -5,7 +5,6 @@ struct ReceiveView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var showWebReceive = false
   @State private var showAdvanced = false
-  @State private var spinning = false
   @State private var appeared = false
 
   var body: some View {
@@ -16,14 +15,6 @@ struct ReceiveView: View {
             Spacer(minLength: 40)
             hero
             Spacer(minLength: 40)
-            Button {
-              showWebReceive = true
-            } label: {
-              Label("Receive via link", systemImage: "globe")
-            }
-            .buttonStyle(GlassProminentButtonStyle())
-            .padding(.bottom, 24)
-
             if model.settings.downloadEnabled { downloadCard.padding(.bottom, 16) }
             if !model.receivedFiles.isEmpty { receivedCard }
           }
@@ -38,6 +29,18 @@ struct ReceiveView: View {
       .navigationTitle("")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
+        ToolbarItem(placement: .topBarLeading) {
+          Button {
+            showWebReceive = true
+          } label: {
+            Label("Receive via link", systemImage: "globe")
+              .font(.subheadline.weight(.medium))
+              .padding(.horizontal, 12)
+              .padding(.vertical, 9)
+              .background(.regularMaterial, in: Capsule())
+          }
+          .buttonStyle(.plain)
+        }
         ToolbarItem(placement: .topBarTrailing) {
           NavigationLink {
             HistoryView()
@@ -71,30 +74,13 @@ struct ReceiveView: View {
       }
       .onAppear {
         appeared = true
-        spinning = model.serverRunning && model.settings.animations && !reduceMotion
-      }
-      .onDisappear { spinning = false }
-      .onChange(of: model.serverRunning) { _, running in
-        spinning = running && model.settings.animations && !reduceMotion
       }
     }
   }
 
   private var hero: some View {
     VStack(spacing: 12) {
-      ZStack {
-        Image("LocalSendLogoRing")
-          .resizable()
-          .renderingMode(.template)
-          .foregroundStyle(.tint)
-          .rotationEffect(.degrees(spinning ? 360 : 0))
-          .animation(.linear(duration: 15).repeatForever(autoreverses: false), value: spinning)
-        Image("LocalSendLogoCenter")
-          .resizable()
-          .renderingMode(.template)
-          .foregroundStyle(.tint)
-      }
-      .frame(width: 200, height: 200)
+      LocalSendMarkView(rotates: model.serverRunning && model.settings.animations && !reduceMotion)
       .opacity(appeared ? 1 : 0)
       .animation(.easeOut(duration: 0.3).delay(0.2), value: appeared)
 

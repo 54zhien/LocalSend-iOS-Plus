@@ -2,6 +2,18 @@ import Foundation
 import Observation
 import UIKit
 
+enum AppBrightness: String, CaseIterable, Codable {
+  case system, light, dark
+}
+
+enum AppColorMode: String, CaseIterable, Codable {
+  case localsend, oled, yaru, custom
+}
+
+enum AppSendMode: String, CaseIterable, Codable {
+  case single, multiple
+}
+
 /// User settings, persisted to `UserDefaults` as one JSON snapshot.
 @MainActor
 @Observable
@@ -26,6 +38,12 @@ final class AppSettings {
   /// Listening port (53317 by default).
   var port: Int { didSet { save() } }
   var animations: Bool { didSet { save() } }
+  var brightness: AppBrightness { didSet { save() } }
+  var colorMode: AppColorMode { didSet { save() } }
+  var customColorHex: String { didSet { save() } }
+  var languageCode: String { didSet { save() } }
+  var advanced: Bool { didSet { save() } }
+  var sendMode: AppSendMode { didSet { save() } }
 
   private struct Snapshot: Codable {
     var alias: String
@@ -39,6 +57,12 @@ final class AppSettings {
     var pin: String?
     var port: Int?
     var animations: Bool?
+    var brightness: AppBrightness?
+    var colorMode: AppColorMode?
+    var customColorHex: String?
+    var languageCode: String?
+    var advanced: Bool?
+    var sendMode: AppSendMode?
 
     init(from decoder: Decoder) throws {
       let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -53,6 +77,12 @@ final class AppSettings {
       pin = try container.decodeIfPresent(String.self, forKey: .pin)
       port = try container.decodeIfPresent(Int.self, forKey: .port)
       animations = try container.decodeIfPresent(Bool.self, forKey: .animations)
+      brightness = try container.decodeIfPresent(AppBrightness.self, forKey: .brightness)
+      colorMode = try container.decodeIfPresent(AppColorMode.self, forKey: .colorMode)
+      customColorHex = try container.decodeIfPresent(String.self, forKey: .customColorHex)
+      languageCode = try container.decodeIfPresent(String.self, forKey: .languageCode)
+      advanced = try container.decodeIfPresent(Bool.self, forKey: .advanced)
+      sendMode = try container.decodeIfPresent(AppSendMode.self, forKey: .sendMode)
     }
 
     init(
@@ -66,7 +96,13 @@ final class AppSettings {
       encryption: Bool,
       pin: String,
       port: Int,
-      animations: Bool
+      animations: Bool,
+      brightness: AppBrightness,
+      colorMode: AppColorMode,
+      customColorHex: String,
+      languageCode: String,
+      advanced: Bool,
+      sendMode: AppSendMode
     ) {
       self.alias = alias
       self.quickSave = quickSave
@@ -79,6 +115,12 @@ final class AppSettings {
       self.pin = pin
       self.port = port
       self.animations = animations
+      self.brightness = brightness
+      self.colorMode = colorMode
+      self.customColorHex = customColorHex
+      self.languageCode = languageCode
+      self.advanced = advanced
+      self.sendMode = sendMode
     }
   }
 
@@ -98,6 +140,12 @@ final class AppSettings {
       pin = snapshot.pin ?? ""
       port = snapshot.port ?? 53317
       animations = snapshot.animations ?? true
+      brightness = snapshot.brightness ?? .system
+      colorMode = snapshot.colorMode ?? .localsend
+      customColorHex = snapshot.customColorHex ?? "008F89"
+      languageCode = snapshot.languageCode ?? "system"
+      advanced = snapshot.advanced ?? false
+      sendMode = snapshot.sendMode ?? .single
     } else {
       alias = UIDevice.current.name
       quickSave = true
@@ -110,6 +158,12 @@ final class AppSettings {
       pin = ""
       port = 53317
       animations = true
+      brightness = .system
+      colorMode = .localsend
+      customColorHex = "008F89"
+      languageCode = "system"
+      advanced = false
+      sendMode = .single
     }
   }
 
@@ -125,7 +179,13 @@ final class AppSettings {
       encryption: encryption,
       pin: pin,
       port: port,
-      animations: animations
+      animations: animations,
+      brightness: brightness,
+      colorMode: colorMode,
+      customColorHex: customColorHex,
+      languageCode: languageCode,
+      advanced: advanced,
+      sendMode: sendMode
     )
     guard let data = try? JSONEncoder().encode(snapshot) else { return }
     UserDefaults.standard.set(data, forKey: "settings")

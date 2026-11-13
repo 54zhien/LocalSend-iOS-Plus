@@ -63,7 +63,7 @@ struct HistoryView: View {
         HStack(spacing: 10) {
           Image(systemName: entry.direction == .received ? "arrow.down.circle" : "arrow.up.circle")
             .font(.system(size: 20))
-            .foregroundStyle(entry.direction == .received ? AnyShapeStyle(Color.localSendAccent) : AnyShapeStyle(.secondary))
+            .foregroundStyle(entry.direction == .received ? AnyShapeStyle(model.settings.accentColor) : AnyShapeStyle(.secondary))
           Text(entry.alias)
             .font(.subheadline.weight(.semibold))
           Spacer(minLength: 0)

@@ -2,8 +2,18 @@ import SwiftUI
 import UIKit
 
 struct AmbientBackground: View {
+  @Environment(AppModel.self) private var model
+  @Environment(\.colorScheme) private var colorScheme
+
   var body: some View {
-    Color(uiColor: .systemBackground).ignoresSafeArea()
+    Group {
+      if model.settings.colorMode == .oled && colorScheme == .dark {
+        Color.black
+      } else {
+        Color(uiColor: .systemBackground)
+      }
+    }
+    .ignoresSafeArea()
   }
 }
 
@@ -14,12 +24,16 @@ enum AppRadius {
 extension Color {
   static let localSendAccent = Color(uiColor: UIColor { traits in
     traits.userInterfaceStyle == .dark
-      ? UIColor(red: 0.514, green: 0.839, blue: 0.788, alpha: 1)
+      ? UIColor(red: 0, green: 0.561, blue: 0.537, alpha: 1)
       : UIColor(red: 0, green: 0.502, blue: 0.502, alpha: 1)
   })
 }
 
 extension View {
+  func materialControl() -> some View {
+    self.background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+  }
+
   @ViewBuilder
   func softTopScrollEdge() -> some View {
     if #available(iOS 26.0, *) {

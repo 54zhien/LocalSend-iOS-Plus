@@ -101,6 +101,7 @@ final class AppModel {
   private var activePeerFingerprint = ""
   private var started = false
   private var webReceiveMode = false
+  private var webSendFiles: [SelectedFile]?
   var isWebReceiving: Bool { webReceiveMode }
 
   init() {
@@ -168,7 +169,7 @@ final class AppModel {
 
   /// Re-applies settings that require restarting the listener.
   func applyNetworkSettings() {
-    let encrypted = settings.encryption && !webReceiveMode
+    let encrypted = settings.encryption && !webReceiveMode && webSendFiles == nil
     deviceIdentity = DeviceIdentity(
       alias: settings.alias,
       fingerprint: identity.fingerprint,
@@ -207,7 +208,7 @@ final class AppModel {
       alias: settings.alias,
       fingerprint: identity.fingerprint,
       port: settings.port,
-      protocolName: settings.encryption && !webReceiveMode ? "https" : "http"
+      protocolName: settings.encryption && !webReceiveMode && webSendFiles == nil ? "https" : "http"
     )
     publishInfo()
   }
@@ -218,11 +219,22 @@ final class AppModel {
 
   private func configureServer() {
     server.identity = identity
-    server.encryption = settings.encryption && !webReceiveMode
+    server.encryption = settings.encryption && !webReceiveMode && webSendFiles == nil
     server.webUploadEnabled = webReceiveMode
-    server.pin = settings.pin.isEmpty ? nil : settings.pin
+    server.webSendEnabled = webSendFiles != nil
+    server.pin = webSendFiles != nil || settings.pin.isEmpty ? nil : settings.pin
     server.port = settings.port
-    server.downloadProvider = settings.downloadEnabled ? { [downloadBox] in downloadBox.value } : nil
+    if let webSendFiles {
+      let files = webSendFiles.map {
+        FileDTO(id: $0.id, fileName: $0.name, size: $0.size, fileType: $0.fileType)
+      }
+      let urls = Dictionary(uniqueKeysWithValues: webSendFiles.map { ($0.id, $0.url) })
+      server.downloadProvider = { files }
+      server.downloadURLProvider = { urls[$0.id] }
+    } else {
+      server.downloadProvider = settings.downloadEnabled ? { [downloadBox] in downloadBox.value } : nil
+      server.downloadURLProvider = nil
+    }
     server.identityProvider = { [infoBox] in infoBox.value }
     let destinationBox = destination.box
     server.destinationProvider = { destinationBox.value ?? LocalHTTPServer.downloadsDirectory() }
@@ -242,6 +254,18 @@ final class AppModel {
   func endWebReceive() {
     guard webReceiveMode else { return }
     webReceiveMode = false
+    applyNetworkSettings()
+  }
+
+  func beginWebSend(files: [SelectedFile]) {
+    guard !files.isEmpty else { return }
+    webSendFiles = files
+    applyNetworkSettings()
+  }
+
+  func endWebSend() {
+    guard webSendFiles != nil else { return }
+    webSendFiles = nil
     applyNetworkSettings()
   }
 

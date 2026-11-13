@@ -12,6 +12,10 @@ struct SendView: View {
   @State private var favoriteSheetPresented = false
   @State private var scannerPresented = false
   @State private var detailsDevice: Device?
+  @State private var webSendPresented = false
+  @State private var webSendFiles: [SelectedFile] = []
+  @State private var pendingWebSend = false
+  @State private var sendModeHelpPresented = false
 
   var body: some View {
     @Bindable var model = model
@@ -35,8 +39,16 @@ struct SendView: View {
           onPick: { urls in
             model.selection.append(contentsOf: urls.compactMap(SelectedFile.make(from:)))
             importerPresented = false
+            if pendingWebSend && !model.selection.isEmpty {
+              webSendFiles = model.selection
+              webSendPresented = true
+            }
+            pendingWebSend = false
           },
-          onCancel: { importerPresented = false }
+          onCancel: {
+            importerPresented = false
+            pendingWebSend = false
+          }
         )
       }
       .sheet(isPresented: $folderPickerPresented) {
@@ -75,6 +87,15 @@ struct SendView: View {
             }
         }
       }
+      .sheet(isPresented: $webSendPresented) {
+        WebSendView(files: webSendFiles)
+          .presentationDetents([.large])
+      }
+      .alert("Send mode", isPresented: $sendModeHelpPresented) {
+        Button("Done", role: .cancel) {}
+      } message: {
+        Text("Single sends to one device. Multiple keeps the selection so you can send it to several devices. Share via link lets browsers download the selection.")
+      }
       .sheet(isPresented: $favoriteSheetPresented) {
         AddFavoriteSheet { alias, host in
           model.addFavorite(alias: alias, host: host)
@@ -100,7 +121,7 @@ struct SendView: View {
     if model.selection.isEmpty {
       VStack(alignment: .leading, spacing: 14) {
         SectionHeader(title: "Selection")
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+        HStack(spacing: 8) {
           selectionButton("Media", symbol: "photo") { mediaPickerPresented = true }
           selectionButton("Text", symbol: "text.alignleft") { textSheetPresented = true }
           selectionButton("Clipboard", symbol: "doc.on.clipboard") {
@@ -167,11 +188,15 @@ struct SendView: View {
 
   private func selectionButton(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
     Button(action: action) {
-      VStack(spacing: 8) {
-        Image(systemName: symbol).font(.title3)
-        Text(LocalizedStringKey(title)).font(.subheadline).lineLimit(1)
+      VStack(spacing: 7) {
+        Image(systemName: symbol).font(.system(size: 20, weight: .medium))
+        Text(LocalizedStringKey(title))
+          .font(.system(size: 13, weight: .medium))
+          .lineLimit(1)
+          .minimumScaleFactor(0.78)
       }
-      .frame(maxWidth: .infinity, minHeight: 68)
+      .frame(maxWidth: .infinity)
+      .frame(height: 76)
       .glassPanel(interactive: true)
     }
     .buttonStyle(.plain)
@@ -245,10 +270,38 @@ struct SendView: View {
             Image(systemName: "heart.fill")
           }
           .accessibilityLabel("Add favourite")
-          NavigationLink { SettingsView(settings: model.settings) } label: {
+          Menu {
+            Button {
+              model.settings.sendMode = .single
+            } label: {
+              Label("Single recipient", systemImage: model.settings.sendMode == .single ? "checkmark.circle.fill" : "circle")
+            }
+            Button {
+              model.settings.sendMode = .multiple
+            } label: {
+              Label("Multiple recipients", systemImage: model.settings.sendMode == .multiple ? "checkmark.circle.fill" : "circle")
+            }
+            Button {
+              if model.selection.isEmpty {
+                pendingWebSend = true
+                importerPresented = true
+              } else {
+                webSendFiles = model.selection
+                webSendPresented = true
+              }
+            } label: {
+              Label("Share via link", systemImage: "link")
+            }
+            Divider()
+            Button {
+              sendModeHelpPresented = true
+            } label: {
+              Label("Send mode help", systemImage: "questionmark.circle")
+            }
+          } label: {
             Image(systemName: "gearshape.fill")
           }
-          .accessibilityLabel("Settings")
+          .accessibilityLabel("Send mode")
         }
 
         if model.discovery.devices.isEmpty {
@@ -324,7 +377,11 @@ struct SendView: View {
   private func send(to device: Device) {
     let files = model.selection
     guard !files.isEmpty else { return }
-    model.selection = []
+    if model.outgoing != nil {
+      model.errorMessage = String(localized: "Finish the current transfer first.")
+      return
+    }
+    if model.settings.sendMode == .single { model.selection = [] }
     model.send(files: files, to: device)
   }
 
