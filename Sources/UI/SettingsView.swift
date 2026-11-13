@@ -35,6 +35,7 @@ struct SettingsView: View {
       .softTopScrollEdge()
       .background(AmbientBackground())
       .navigationTitle("Settings")
+      .navigationBarTitleDisplayMode(.inline)
       .fileImporter(
         isPresented: $choosingFolder,
         allowedContentTypes: [.folder],

@@ -40,7 +40,7 @@ struct ReceiveView: View {
         .softTopScrollEdge()
       }
       .background(AmbientBackground())
-      .navigationTitle("Receive")
+      .navigationTitle("")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .topBarTrailing) {
