@@ -75,6 +75,8 @@ final class AppModel {
   var pinRequest: PinRequest?
   var downloadRequest: DownloadRequest?
   var errorMessage: String?
+  /// Drives the floating "add favourite" panel, which lives above every tab.
+  var addFavoriteRequested = false
   /// Files staged for the next send, also filled by the Share Extension.
   var selection: [SelectedFile] = []
 

@@ -32,6 +32,25 @@ struct RootView: View {
     .preferredColorScheme(model.settings.preferredColorScheme)
     .environment(\.locale, model.settings.selectedLocale)
     .background(AmbientBackground())
+    .overlay {
+      if model.addFavoriteRequested {
+        AddFavoritePanel(
+          onCancel: {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+              model.addFavoriteRequested = false
+            }
+          },
+          onSave: { alias, host in
+            model.addFavorite(alias: alias, host: host)
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+              model.addFavoriteRequested = false
+            }
+          }
+        )
+        .transition(.opacity)
+        .zIndex(1)
+      }
+    }
     .task {
       model.start()
       model.consumeShareInbox()

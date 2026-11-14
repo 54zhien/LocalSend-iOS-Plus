@@ -12,7 +12,6 @@ struct SendView: View {
   @State private var mediaPickerPresented = false
   @State private var textSheetPresented = false
   @State private var textDraft = ""
-  @State private var favoriteSheetPresented = false
   @State private var scannerPresented = false
   @State private var detailsDevice: Device?
   @State private var webSendPresented = false
@@ -104,11 +103,6 @@ struct SendView: View {
         Button("Done", role: .cancel) {}
       } message: {
         Text("Single sends to one device. Multiple keeps the selection so you can send it to several devices. Share via link lets browsers download the selection.")
-      }
-      .sheet(isPresented: $favoriteSheetPresented) {
-        AddFavoriteSheet { alias, host in
-          model.addFavorite(alias: alias, host: host)
-        }
       }
       .sheet(item: $detailsDevice) { device in
         DeviceDetailsSheet(device: device)
@@ -312,7 +306,11 @@ struct SendView: View {
             Image(systemName: "qrcode.viewfinder")
           }
           .accessibilityLabel("Scan QR code")
-          Button { favoriteSheetPresented = true } label: {
+          Button {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+              model.addFavoriteRequested = true
+            }
+          } label: {
             Image(systemName: "heart.fill")
           }
           .accessibilityLabel("Add favourite")
@@ -451,55 +449,6 @@ struct SendView: View {
       model.addFavorite(alias: trimmed, host: trimmed)
     }
     scannerPresented = false
-  }
-}
-
-/// Add a favourite by address, like the Flutter `favorite_dialog`.
-struct AddFavoriteSheet: View {
-  @Environment(\.dismiss) private var dismiss
-  @State private var alias = ""
-  @State private var host = ""
-
-  let onSave: (String, String) -> Void
-
-  var body: some View {
-    NavigationStack {
-      VStack(spacing: 16) {
-        VStack(spacing: 0) {
-          TextField("Name", text: $alias)
-            .textFieldStyle(.plain)
-            .padding(.horizontal, 22)
-            .frame(height: 54)
-          Divider().padding(.horizontal, 22)
-          TextField("192.168.178.20", text: $host)
-            .textFieldStyle(.plain)
-            .padding(.horizontal, 22)
-            .frame(height: 54)
-            .keyboardType(.decimalPad)
-            .autocorrectionDisabled()
-        }
-        .background(.regularMaterial, in: Capsule())
-        Spacer(minLength: 0)
-      }
-      .padding(20)
-      .background(AmbientBackground())
-      .navigationTitle("Add favourite")
-      .navigationBarTitleDisplayMode(.inline)
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Save") {
-            onSave(alias, host)
-            dismiss()
-          }
-          .disabled(alias.trimmingCharacters(in: .whitespaces).isEmpty || host.isEmpty)
-        }
-      }
-    }
-    .presentationDetents([.height(300)])
-    .presentationCornerRadius(55)
   }
 }
 
