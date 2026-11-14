@@ -31,11 +31,14 @@ struct WebReceiveView: View {
           Button {
             UIPasteboard.general.url = url
           } label: {
-            Label("Copy link", systemImage: "doc.on.doc")
-              .font(.headline)
-              .frame(maxWidth: .infinity)
-              .padding(.vertical, 14)
-              .background(.regularMaterial, in: Capsule())
+            HStack {
+              Spacer(minLength: 0)
+              Label("Copy link", systemImage: "doc.on.doc")
+                .font(.headline)
+              Spacer(minLength: 0)
+            }
+            .padding(.vertical, 14)
+            .glassPanel(cornerRadius: 32, interactive: true)
           }
           .buttonStyle(.plain)
       }
