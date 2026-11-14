@@ -535,6 +535,14 @@ final class HTTPConnection {
   private var didRoute = false
   private var didRespond = false
   private var prefetched = Data()
+  // Streamed uploads (reqwest `Body::wrap_stream`) carry Transfer-Encoding: chunked and no
+  // Content-Length, so the body has to be de-framed here instead of being counted.
+  private var chunked = false
+  private var unbounded = false
+  private var chunkBuffer = Data()
+  private var chunkRemaining = 0
+  private var expectsChunkCRLF = false
+  private static let crlf = Data("\r\n".utf8)
   private var isClosed = false
   private var onFinish: ((String, URL) -> Bool)?
   /// Called once when the connection is torn down, so the server can release it.
@@ -564,8 +572,16 @@ final class HTTPConnection {
     connection.receive(minimumIncompleteLength: 1, maximumLength: 1 << 16) { [weak self] data, _, isComplete, error in
       guard let self, !self.isClosed else { return }
       if let data, !data.isEmpty { self.consume(data) }
-      if error != nil || isComplete {
+      if error != nil {
         self.close()
+        return
+      }
+      if isComplete {
+        if self.isUpload, !self.didRespond, self.fileHandle != nil {
+          self.finishUpload()
+        } else {
+          self.close()
+        }
         return
       }
       if !self.isClosed { self.receive() }
@@ -589,11 +605,19 @@ final class HTTPConnection {
       }
 
       bodyLength = Int(headers["content-length"] ?? "0") ?? 0
+      chunked = headers["transfer-encoding"]?.lowercased().contains("chunked") == true
       let pathOnly = path.split(separator: "?").first.map(String.init) ?? path
       isUpload = method == "POST" && pathOnly == "/api/localsend/v2/upload"
 
       if isUpload {
-        // Keep bytes that arrived with the headers; the upload handler writes them first.
+        // Route first: the handler opens the destination and installs the file handle.
+        if chunked {
+          chunkBuffer.append(chunk)
+          server.route(connection: self, method: method, path: path, body: Data(), peerIp: peerAddress)
+          pumpChunked()
+          return
+        }
+        if bodyLength == 0 { unbounded = true }
         prefetched = chunk
         server.route(connection: self, method: method, path: path, body: Data(), peerIp: peerAddress)
         return
@@ -607,7 +631,10 @@ final class HTTPConnection {
 
     guard !isClosed else { return }
 
-    if isUpload {
+    if chunked {
+      if !chunk.isEmpty { chunkBuffer.append(chunk) }
+      pumpChunked()
+    } else if isUpload {
       if !chunk.isEmpty { writeToFile(chunk) }
     } else {
       body.append(chunk)
@@ -628,7 +655,7 @@ final class HTTPConnection {
   func beginFileUpload(handle: FileHandle, url: URL, onFinish: @escaping (String, URL) -> Bool) {
     fileHandle = handle
     fileURL = url
-    remaining = bodyLength
+    remaining = (chunked || unbounded || bodyLength == 0) ? Int.max : bodyLength
     self.onFinish = onFinish
     didRoute = true
     if remaining <= 0 { finishUpload() }
@@ -646,6 +673,42 @@ final class HTTPConnection {
     handle.write(Data(slice))
     remaining -= slice.count
     if remaining <= 0 { finishUpload() }
+  }
+
+  /// Decodes RFC 7230 chunked framing, writing payload bytes straight to the destination.
+  private func pumpChunked() {
+    while true {
+      if expectsChunkCRLF {
+        guard chunkBuffer.count >= 2 else { return }
+        chunkBuffer.removeFirst(2)
+        expectsChunkCRLF = false
+      }
+
+      if chunkRemaining == 0 {
+        guard let crlf = chunkBuffer.range(of: Self.crlf) else { return }
+        let line = String(decoding: chunkBuffer[..<crlf.lowerBound], as: UTF8.self)
+        chunkBuffer.removeSubrange(chunkBuffer.startIndex..<crlf.upperBound)
+        let sizeText = line.split(separator: ";").first.map { $0.trimmingCharacters(in: .whitespaces) }
+          ?? line
+        guard let size = Int(sizeText, radix: 16) else {
+          close()
+          return
+        }
+        if size == 0 {
+          if isUpload { finishUpload() } else { routeOnce(body: body) }
+          return
+        }
+        chunkRemaining = size
+      }
+
+      guard !chunkBuffer.isEmpty else { return }
+      let take = min(chunkRemaining, chunkBuffer.count)
+      let piece = Data(chunkBuffer.prefix(take))
+      chunkBuffer.removeFirst(take)
+      chunkRemaining -= take
+      if isUpload { writeToFile(piece) } else { body.append(piece) }
+      if chunkRemaining == 0 { expectsChunkCRLF = true }
+    }
   }
 
   private func finishUpload() {
