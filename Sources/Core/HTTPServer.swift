@@ -569,7 +569,7 @@ final class HTTPConnection {
   }
 
   private func receive() {
-    connection.receive(minimumIncompleteLength: 1, maximumLength: 1 << 16) { [weak self] data, _, isComplete, error in
+    connection.receive(minimumIncompleteLength: 1, maximumLength: 1 << 20) { [weak self] data, _, isComplete, error in
       guard let self, !self.isClosed else { return }
       if let data, !data.isEmpty { self.consume(data) }
       if error != nil {
