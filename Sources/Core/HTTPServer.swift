@@ -43,6 +43,9 @@ final class LocalHTTPServer {
 
   private let queue = DispatchQueue(label: "org.localsend.http.server")
   private var listener: NWListener?
+  /// Retains every live connection: the receive callbacks hold self weakly, so without
+  /// this the object is deallocated immediately after start() and the peer never gets a reply.
+  private var connections: [ObjectIdentifier: HTTPConnection] = [:]
   /// Guards against a cancelled listener reporting a stale state after a restart.
   private var generation = 0
   private var sessions: [String: Session] = [:]
@@ -104,7 +107,13 @@ final class LocalHTTPServer {
     let listener = try NWListener(using: parameters, on: nwPort)
     listener.newConnectionHandler = { [weak self] connection in
       guard let self else { return }
-      HTTPConnection(connection: connection, server: self, queue: self.queue).start()
+      let conn = HTTPConnection(connection: connection, server: self, queue: self.queue)
+      let key = ObjectIdentifier(conn)
+      self.connections[key] = conn
+      conn.onClose = { [weak self] in
+        self?.queue.async { self?.connections.removeValue(forKey: key) }
+      }
+      conn.start()
     }
     listener.stateUpdateHandler = { [weak self] state in
       guard let self, currentGeneration == self.generation else { return }
@@ -528,6 +537,8 @@ final class HTTPConnection {
   private var prefetched = Data()
   private var isClosed = false
   private var onFinish: ((String, URL) -> Bool)?
+  /// Called once when the connection is torn down, so the server can release it.
+  var onClose: (() -> Void)?
 
   private static let headerTerminator = Data("\r\n\r\n".utf8)
 
@@ -713,5 +724,7 @@ final class HTTPConnection {
     fileHandle?.closeFile()
     fileHandle = nil
     connection.cancel()
+    onClose?()
+    onClose = nil
   }
 }
