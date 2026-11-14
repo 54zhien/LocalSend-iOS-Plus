@@ -25,11 +25,7 @@ struct SettingsView: View {
           toggleRow("Advanced settings", isOn: $settings.advanced)
             .padding(.horizontal, 12)
           VStack(spacing: 10) {
-            Image("LocalSendLogo")
-              .resizable()
-              .renderingMode(.template)
-              .foregroundStyle(.tint)
-              .frame(width: 140, height: 140)
+            LocalSendMarkView(rotates: false, size: 140)
             Text("LocalSend").font(.largeTitle.weight(.semibold))
           }
           .frame(maxWidth: .infinity)
@@ -98,6 +94,9 @@ struct SettingsView: View {
           .pickerStyle(.menu)
           .frame(width: 146, height: 46)
           .materialControl()
+          .onChange(of: settings.colorMode) { _, mode in
+            if mode == .oled { settings.brightness = .dark }
+          }
         }
         if settings.colorMode == .custom {
           HStack(spacing: 12) {

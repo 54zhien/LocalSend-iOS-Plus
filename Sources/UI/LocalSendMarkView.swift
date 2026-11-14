@@ -3,6 +3,7 @@ import SwiftUI
 /// Draws both logo parts in one coordinate system, so rotating the ring never shifts its center.
 struct LocalSendMarkView: View {
   let rotates: Bool
+  var size: CGFloat = 200
 
   var body: some View {
     TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !rotates)) { timeline in
@@ -13,17 +14,17 @@ struct LocalSendMarkView: View {
       ZStack {
         LocalSendRingShape()
           .fill(.tint)
-          .frame(width: 200, height: 200)
+          .frame(width: size, height: size)
           .rotationEffect(.degrees(angle))
 
         Circle()
           .fill(.tint)
-          .frame(width: 200 * 420 / 1024, height: 200 * 420 / 1024)
+          .frame(width: size * 420 / 1024, height: size * 420 / 1024)
       }
-      .frame(width: 200, height: 200)
+      .frame(width: size, height: size)
       .accessibilityHidden(true)
     }
-    .frame(width: 200, height: 200)
+    .frame(width: size, height: size)
   }
 }
 

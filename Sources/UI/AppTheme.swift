@@ -3,6 +3,7 @@ import UIKit
 
 extension AppSettings {
   var preferredColorScheme: ColorScheme? {
+    if colorMode == .oled { return .dark }
     switch brightness {
     case .system: nil
     case .light: .light
