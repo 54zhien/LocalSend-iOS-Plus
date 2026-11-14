@@ -5,6 +5,8 @@ struct ReceiveView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var showWebReceive = false
   @State private var showAdvanced = false
+  @State private var markVisible = true
+  @State private var markFadeTask: Task<Void, Never>?
 
   var body: some View {
     NavigationStack {
@@ -82,12 +84,29 @@ struct ReceiveView: View {
           .presentationDetents([.height(510)])
           .presentationDragIndicator(.visible)
       }
+      .onAppear {
+        guard !markVisible else { return }
+        markFadeTask?.cancel()
+        markFadeTask = Task {
+          try? await Task.sleep(for: .milliseconds(80))
+          guard !Task.isCancelled else { return }
+          markVisible = true
+        }
+      }
+      .onDisappear {
+        markFadeTask?.cancel()
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { markVisible = false }
+      }
     }
   }
 
   private var hero: some View {
     VStack(spacing: 12) {
       LocalSendMarkView(rotates: model.serverRunning && model.settings.animations && !reduceMotion)
+        .opacity(markVisible ? 1 : 0)
+        .animation(.easeIn(duration: 0.28), value: markVisible)
 
       Text(model.deviceIdentity.alias)
         .font(.system(size: 48, weight: .regular))
