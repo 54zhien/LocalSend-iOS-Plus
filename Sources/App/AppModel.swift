@@ -70,6 +70,7 @@ final class AppModel {
   let destination = DestinationStore()
   private let announcer = Announcer()
   private var announceTask: Task<Void, Never>?
+  private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
   var incoming: IncomingRequest?
   var outgoing: OutgoingTransfer?
   var pinRequest: PinRequest?
@@ -149,8 +150,47 @@ final class AppModel {
     startAnnouncing()
   }
 
+  /// Re-arms the listener after iOS suspended the app.
+  ///
+  /// iOS closes the listening socket when the process is suspended, but `serverRunning`
+  /// keeps reading `true` and the peer still shows up in other devices' lists — so the app
+  /// looks online while refusing every connection until the listener is created again.
+  func resumeAfterForeground() {
+    guard started else {
+      start()
+      return
+    }
+    // Never drop a live session: a suspended app cannot have one, so this only guards
+    // against a foreground return that races a running transfer.
+    guard incoming == nil, outgoing == nil, pinRequest == nil else { return }
+    applyNetworkSettings()
+    // The multicast socket is suspended along with the process, so peers stop seeing us
+    // until both the discovery listener and the announce loop are created again.
+    discovery.stop()
+    discovery.start(identity: identity, ownFingerprint: identity.fingerprint, interval: settings.scanInterval, timeout: settings.discoveryTimeout)
+    startAnnouncing()
+  }
+
+  /// Asks iOS for a short grace period so a transfer survives switching to another app.
+  func beginBackgroundGrace() {
+    guard backgroundTask == .invalid else { return }
+    backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "LocalSend receive") { [weak self] in
+      self?.endBackgroundGrace()
+    }
+  }
+
+  func endBackgroundGrace() {
+    guard backgroundTask != .invalid else { return }
+    UIApplication.shared.endBackgroundTask(backgroundTask)
+    backgroundTask = .invalid
+  }
+
   /// Peers on the same subnet hear this datagram and add us to their list right away.
   func announcePresence() {
+    // Advertising a device that cannot accept a connection makes peers pin a port that
+    // answers with someone else's certificate (or nothing at all): only announce when this
+    // process actually owns the listener.
+    guard serverRunning else { return }
     let announce = deviceIdentity.announce(downloadEnabled: settings.downloadEnabled)
     guard let payload = try? JSONEncoder().encode(announce) else { return }
     announcer.announce(

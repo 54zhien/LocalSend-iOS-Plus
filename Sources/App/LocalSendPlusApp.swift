@@ -14,6 +14,7 @@ struct LocalSendPlusApp: App {
 
 struct RootView: View {
   @Environment(AppModel.self) private var model
+  @Environment(\.scenePhase) private var scenePhase
 
   var body: some View {
     @Bindable var model = model
@@ -87,6 +88,19 @@ struct RootView: View {
       Button("OK", role: .cancel) {}
     } message: { message in
       Text(message)
+    }
+    .onChange(of: scenePhase) { _, phase in
+      switch phase {
+      case .active:
+        // iOS tore the listening socket down while suspended; recreate it before the user
+        // wonders why the phone stopped accepting transfers.
+        model.resumeAfterForeground()
+        model.endBackgroundGrace()
+      case .background:
+        model.beginBackgroundGrace()
+      default:
+        break
+      }
     }
   }
 }
