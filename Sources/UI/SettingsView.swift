@@ -9,6 +9,7 @@ struct SettingsView: View {
   @State private var aliasDraft = ""
   @State private var pinDraft = ""
   @State private var portDraft = ""
+  @State private var deviceModelDraft = ""
   @State private var pinEditing = false
   @State private var showingLanguages = false
 
@@ -54,6 +55,7 @@ struct SettingsView: View {
         pinDraft = settings.pin
         pinEditing = !settings.pin.isEmpty
         portDraft = String(settings.port)
+        deviceModelDraft = settings.deviceModel
       }
       .sheet(isPresented: $showingLanguages) {
         LanguagePickerView(settings: settings)
@@ -162,7 +164,25 @@ struct SettingsView: View {
   private var deviceCard: some View {
     GlassCard {
       VStack(alignment: .leading, spacing: 16) {
-        settingsValue("Server", model.serverRunning ? "Running" : "Stopped")
+        HStack(spacing: 12) {
+          Text(LocalizedStringKey(model.serverRunning ? "Server" : "Server (offline)"))
+            .font(.subheadline)
+            .frame(maxWidth: .infinity, alignment: .leading)
+          HStack(spacing: 28) {
+            Button {
+              if model.serverRunning { model.applyNetworkSettings() }
+              else { model.start() }
+            } label: {
+              Image(systemName: model.serverRunning ? "arrow.clockwise" : "play.fill")
+            }
+            .accessibilityLabel(model.serverRunning ? "Restart" : "Start")
+            Button { model.stop() } label: { Image(systemName: "stop.fill") }
+              .disabled(!model.serverRunning)
+              .accessibilityLabel("Stop")
+          }
+          .frame(width: 146, height: 46)
+          .materialControl()
+        }
 
         HStack(spacing: 12) {
           Text("Device name")
@@ -181,10 +201,37 @@ struct SettingsView: View {
           .materialControl()
         }
 
-        settingsValue("Device type", "iPhone")
-        settingsValue("Device model", model.deviceIdentity.deviceModel)
+        if settings.advanced {
+          HStack(spacing: 12) {
+            Text("Device type").frame(maxWidth: .infinity, alignment: .leading)
+            Picker("Device type", selection: $settings.deviceType) {
+              ForEach(DeviceType.allCases, id: \.self) { type in
+                Text(LocalizedStringKey(type.rawValue.capitalized)).tag(type)
+              }
+            }
+            .labelsHidden()
+            .frame(width: 146, height: 46)
+            .materialControl()
+            .onChange(of: settings.deviceType) { model.applyNetworkSettings() }
+          }
+          HStack(spacing: 12) {
+            Text("Device model").frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 4) {
+              TextField("Device model", text: $deviceModelDraft)
+                .textFieldStyle(.plain)
+                .submitLabel(.done)
+                .onSubmit { applyDeviceModel() }
+              Button { applyDeviceModel() } label: { Image(systemName: "checkmark") }
+                .disabled(deviceModelDraft == settings.deviceModel)
+            }
+            .padding(12)
+            .frame(width: 146)
+            .materialControl()
+          }
+        }
 
-        HStack(spacing: 12) {
+        if settings.advanced {
+          HStack(spacing: 12) {
           Text("Port")
             .font(.subheadline)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -199,9 +246,9 @@ struct SettingsView: View {
           .padding(12)
           .frame(width: 146)
           .materialControl()
-        }
+          }
 
-        HStack(spacing: 12) {
+          HStack(spacing: 12) {
           Text("Scan interval")
             .font(.subheadline)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -215,14 +262,31 @@ struct SettingsView: View {
             .frame(width: 146, height: 46)
             .materialControl()
             .onChange(of: settings.scanInterval) {
-              model.discovery.restart(interval: settings.scanInterval)
+              model.discovery.restart(interval: settings.scanInterval, timeout: settings.discoveryTimeout)
+            }
+          }
+
+          HStack(spacing: 12) {
+            Text("Discovery timeout").frame(maxWidth: .infinity, alignment: .leading)
+            Picker("Discovery timeout", selection: $settings.discoveryTimeout) {
+              ForEach([0.5, 0.9, 1.5, 3.0, 5.0], id: \.self) { seconds in
+                Text("\(seconds.formatted()) s").tag(seconds)
+              }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(width: 146, height: 46)
+            .materialControl()
+            .onChange(of: settings.discoveryTimeout) {
+              model.discovery.restart(interval: settings.scanInterval, timeout: settings.discoveryTimeout)
+            }
+          }
+
+          toggleRow("Encryption", isOn: $settings.encryption)
+            .onChange(of: settings.encryption) { _, _ in
+              model.applyNetworkSettings()
             }
         }
-
-        toggleRow("Encryption", isOn: $settings.encryption)
-          .onChange(of: settings.encryption) { _, _ in
-            model.applyNetworkSettings()
-          }
 
         VStack(alignment: .leading, spacing: 4) {
           Text("Fingerprint")
@@ -236,8 +300,11 @@ struct SettingsView: View {
           Task { await model.discovery.scan() }
         } label: {
           Label("Scan now", systemImage: "arrow.triangle.2.circlepath")
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(.regularMaterial, in: Capsule())
         }
-        .buttonStyle(GlassProminentButtonStyle())
+        .buttonStyle(.plain)
       }
     }
   }
@@ -254,6 +321,13 @@ struct SettingsView: View {
   private func applyAlias() {
     model.updateAlias(aliasDraft)
     aliasDraft = settings.alias
+  }
+
+  private func applyDeviceModel() {
+    let value = deviceModelDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !value.isEmpty else { deviceModelDraft = settings.deviceModel; return }
+    settings.deviceModel = value
+    model.applyNetworkSettings()
   }
 
   private var transfersCard: some View {
@@ -293,6 +367,11 @@ struct SettingsView: View {
         }
         toggleRow("Save media to Photos", isOn: $settings.saveToPhotos)
         toggleRow("Auto finish", isOn: $settings.autoFinish)
+        toggleRow("Save to history", isOn: $settings.saveHistory)
+        if settings.advanced {
+          toggleRow("Verify checksums", isOn: $settings.verifyChecksums)
+            .onChange(of: settings.verifyChecksums) { model.applyNetworkSettings() }
+        }
         HStack(spacing: 12) {
           Text("Receive folder")
             .font(.subheadline)
@@ -322,6 +401,7 @@ struct SettingsView: View {
           .onChange(of: settings.downloadEnabled) {
             model.applyNetworkSettings()
           }
+        toggleRow("Create checksums", isOn: $settings.createChecksums)
       }
     }
   }

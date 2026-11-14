@@ -21,19 +21,23 @@ struct SendView: View {
     @Bindable var model = model
 
     NavigationStack {
-      ScrollView {
-        VStack(spacing: 18) {
-          selectionCard(model: model)
-          if !model.favorites.devices.isEmpty { favoritesCard }
-          devicesCard
+      GeometryReader { geometry in
+        ScrollView {
+          VStack(spacing: 18) {
+            selectionCard(model: model)
+            if !model.favorites.devices.isEmpty { favoritesCard }
+            devicesCard
+            Spacer(minLength: 0)
+          }
+          .padding(15)
+          .frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .top)
         }
-        .padding(15)
+        .softTopScrollEdge()
+        .refreshable { await model.discovery.refresh() }
       }
-      .softTopScrollEdge()
       .background(AmbientBackground())
       .navigationTitle("Send")
       .toolbar(.hidden, for: .navigationBar)
-      .refreshable { await model.discovery.scan() }
       .sheet(isPresented: $importerPresented) {
         FilePicker(
           onPick: { urls in

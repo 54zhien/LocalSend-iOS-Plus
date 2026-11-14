@@ -50,10 +50,22 @@ struct ReceiveView: View {
         }
         ToolbarItem(placement: .topBarTrailing) {
           Button {
-            withAnimation(.easeInOut(duration: 0.2)) { showAdvanced.toggle() }
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) { showAdvanced.toggle() }
           } label: {
             Image(systemName: "info.circle")
           }
+        }
+      }
+      .overlay {
+        if showAdvanced {
+          Color.clear
+            .contentShape(Rectangle())
+            .ignoresSafeArea()
+            .onTapGesture {
+              withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
+                showAdvanced = false
+              }
+            }
         }
       }
       .overlay(alignment: .topTrailing) {
@@ -62,7 +74,8 @@ struct ReceiveView: View {
             .frame(maxWidth: 310)
             .padding(.top, 8)
             .padding(.trailing, 16)
-            .transition(.opacity.combined(with: .move(edge: .top)))
+            .compositingGroup()
+            .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .topTrailing)))
             .zIndex(1)
         }
       }
@@ -106,7 +119,7 @@ struct ReceiveView: View {
   }
 
   private var serverCard: some View {
-    GlassCard {
+    GlassCard(cornerRadius: 36) {
       VStack(alignment: .leading, spacing: 14) {
         SectionHeader(title: "Server")
         row("State", model.serverRunning ? "Running" : "Stopped")
@@ -118,8 +131,11 @@ struct ReceiveView: View {
           model.refreshIdentity()
         } label: {
           Label("Refresh network info", systemImage: "arrow.clockwise")
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(.regularMaterial, in: Capsule())
         }
-        .buttonStyle(GlassProminentButtonStyle())
+        .buttonStyle(.plain)
       }
     }
   }

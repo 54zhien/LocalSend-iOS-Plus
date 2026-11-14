@@ -44,6 +44,12 @@ final class AppSettings {
   var languageCode: String { didSet { save() } }
   var advanced: Bool { didSet { save() } }
   var sendMode: AppSendMode { didSet { save() } }
+  var saveHistory: Bool { didSet { save() } }
+  var createChecksums: Bool { didSet { save() } }
+  var verifyChecksums: Bool { didSet { save() } }
+  var deviceType: DeviceType { didSet { save() } }
+  var deviceModel: String { didSet { save() } }
+  var discoveryTimeout: Double { didSet { save() } }
 
   private struct Snapshot: Codable {
     var alias: String
@@ -63,6 +69,12 @@ final class AppSettings {
     var languageCode: String?
     var advanced: Bool?
     var sendMode: AppSendMode?
+    var saveHistory: Bool?
+    var createChecksums: Bool?
+    var verifyChecksums: Bool?
+    var deviceType: DeviceType?
+    var deviceModel: String?
+    var discoveryTimeout: Double?
 
     init(from decoder: Decoder) throws {
       let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -83,6 +95,12 @@ final class AppSettings {
       languageCode = try container.decodeIfPresent(String.self, forKey: .languageCode)
       advanced = try container.decodeIfPresent(Bool.self, forKey: .advanced)
       sendMode = try container.decodeIfPresent(AppSendMode.self, forKey: .sendMode)
+      saveHistory = try container.decodeIfPresent(Bool.self, forKey: .saveHistory)
+      createChecksums = try container.decodeIfPresent(Bool.self, forKey: .createChecksums)
+      verifyChecksums = try container.decodeIfPresent(Bool.self, forKey: .verifyChecksums)
+      deviceType = try container.decodeIfPresent(DeviceType.self, forKey: .deviceType)
+      deviceModel = try container.decodeIfPresent(String.self, forKey: .deviceModel)
+      discoveryTimeout = try container.decodeIfPresent(Double.self, forKey: .discoveryTimeout)
     }
 
     init(
@@ -102,7 +120,13 @@ final class AppSettings {
       customColorHex: String,
       languageCode: String,
       advanced: Bool,
-      sendMode: AppSendMode
+      sendMode: AppSendMode,
+      saveHistory: Bool,
+      createChecksums: Bool,
+      verifyChecksums: Bool,
+      deviceType: DeviceType,
+      deviceModel: String,
+      discoveryTimeout: Double
     ) {
       self.alias = alias
       self.quickSave = quickSave
@@ -121,6 +145,12 @@ final class AppSettings {
       self.languageCode = languageCode
       self.advanced = advanced
       self.sendMode = sendMode
+      self.saveHistory = saveHistory
+      self.createChecksums = createChecksums
+      self.verifyChecksums = verifyChecksums
+      self.deviceType = deviceType
+      self.deviceModel = deviceModel
+      self.discoveryTimeout = discoveryTimeout
     }
   }
 
@@ -146,6 +176,12 @@ final class AppSettings {
       languageCode = snapshot.languageCode ?? "system"
       advanced = snapshot.advanced ?? false
       sendMode = snapshot.sendMode ?? .single
+      saveHistory = snapshot.saveHistory ?? true
+      createChecksums = snapshot.createChecksums ?? true
+      verifyChecksums = snapshot.verifyChecksums ?? true
+      deviceType = snapshot.deviceType ?? .mobile
+      deviceModel = snapshot.deviceModel ?? UIDevice.current.model
+      discoveryTimeout = snapshot.discoveryTimeout ?? 0.9
     } else {
       alias = UIDevice.current.name
       quickSave = true
@@ -164,6 +200,12 @@ final class AppSettings {
       languageCode = "system"
       advanced = false
       sendMode = .single
+      saveHistory = true
+      createChecksums = true
+      verifyChecksums = true
+      deviceType = .mobile
+      deviceModel = UIDevice.current.model
+      discoveryTimeout = 0.9
     }
   }
 
@@ -185,7 +227,13 @@ final class AppSettings {
       customColorHex: customColorHex,
       languageCode: languageCode,
       advanced: advanced,
-      sendMode: sendMode
+      sendMode: sendMode,
+      saveHistory: saveHistory,
+      createChecksums: createChecksums,
+      verifyChecksums: verifyChecksums,
+      deviceType: deviceType,
+      deviceModel: deviceModel,
+      discoveryTimeout: discoveryTimeout
     )
     guard let data = try? JSONEncoder().encode(snapshot) else { return }
     UserDefaults.standard.set(data, forKey: "settings")

@@ -58,6 +58,7 @@ final class LocalHTTPServer {
   var downloadURLProvider: ((FileDTO) -> URL?)?
   var webUploadEnabled = false
   var webSendEnabled = false
+  var verifyChecksums = true
   /// Where received files are written; falls back to `Documents/LocalSend`.
   var destinationProvider: (() -> URL)?
   var onEvent: ((ServerEvent) -> Void)?
@@ -307,7 +308,17 @@ final class LocalHTTPServer {
     sessions[sessionId] = session
 
     connection.beginFileUpload(handle: handle.handle, url: handle.url) { [weak self] name, url in
-      guard let self else { return }
+      guard let self else { return false }
+      if self.verifyChecksums, let expected = file.sha256 {
+        guard let actual = try? FileHash.sha256(of: url),
+          actual.caseInsensitiveCompare(expected) == .orderedSame
+        else {
+          try? FileManager.default.removeItem(at: url)
+          self.sessions.removeValue(forKey: sessionId)
+          self.activeSessionId = nil
+          return false
+        }
+      }
       self.onEvent?(.received(fileName: name, url: url))
 
       self.queue.async {
@@ -318,6 +329,7 @@ final class LocalHTTPServer {
           self.activeSessionId = nil
         }
       }
+      return true
     }
   }
 
@@ -474,7 +486,7 @@ final class HTTPConnection {
   private var didRespond = false
   private var prefetched = Data()
   private var isClosed = false
-  private var onFinish: ((String, URL) -> Void)?
+  private var onFinish: ((String, URL) -> Bool)?
 
   private static let headerTerminator = Data("\r\n\r\n".utf8)
 
@@ -561,7 +573,7 @@ final class HTTPConnection {
 
   // MARK: Upload sink
 
-  func beginFileUpload(handle: FileHandle, url: URL, onFinish: @escaping (String, URL) -> Void) {
+  func beginFileUpload(handle: FileHandle, url: URL, onFinish: @escaping (String, URL) -> Bool) {
     fileHandle = handle
     fileURL = url
     remaining = bodyLength
@@ -587,10 +599,8 @@ final class HTTPConnection {
   private func finishUpload() {
     fileHandle?.closeFile()
     fileHandle = nil
-    if let url = fileURL {
-      onFinish?(url.lastPathComponent, url)
-    }
-    respond(status: 200, body: Data(), contentType: "application/octet-stream")
+    let valid = fileURL.map { onFinish?($0.lastPathComponent, $0) ?? false } ?? false
+    respond(status: valid ? 200 : 422, body: Data(), contentType: "application/octet-stream")
   }
 
   private func parseHeaders(_ raw: String) {
@@ -629,6 +639,7 @@ final class HTTPConnection {
     case 403: reason = "Forbidden"
     case 404: reason = "Not Found"
     case 409: reason = "Conflict"
+    case 422: reason = "Unprocessable Content"
     case 429: reason = "Too Many Requests"
     case 500: reason = "Internal Server Error"
     default: reason = "OK"

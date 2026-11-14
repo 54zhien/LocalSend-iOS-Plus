@@ -108,6 +108,8 @@ final class AppModel {
     deviceIdentity = DeviceIdentity(
       alias: settings.alias,
       fingerprint: identity.fingerprint,
+      deviceModel: settings.deviceModel,
+      deviceType: settings.deviceType,
       port: settings.port,
       protocolName: settings.encryption ? "https" : "http"
     )
@@ -132,7 +134,7 @@ final class AppModel {
       errorMessage = error.localizedDescription
     }
 
-    discovery.start(identity: identity, ownFingerprint: identity.fingerprint, interval: settings.scanInterval)
+    discovery.start(identity: identity, ownFingerprint: identity.fingerprint, interval: settings.scanInterval, timeout: settings.discoveryTimeout)
     publishDownloads()
     startAnnouncing()
   }
@@ -165,6 +167,7 @@ final class AppModel {
     discovery.stop()
     server.stop()
     serverRunning = false
+    started = false
   }
 
   /// Re-applies settings that require restarting the listener.
@@ -173,17 +176,23 @@ final class AppModel {
     deviceIdentity = DeviceIdentity(
       alias: settings.alias,
       fingerprint: identity.fingerprint,
+      deviceModel: settings.deviceModel,
+      deviceType: settings.deviceType,
       port: settings.port,
       protocolName: encrypted ? "https" : "http"
     )
     server.stop()
     configureServer()
-    do {
-      try server.start()
-      serverRunning = true
-    } catch {
+    if started {
+      do {
+        try server.start()
+        serverRunning = true
+      } catch {
+        serverRunning = false
+        errorMessage = error.localizedDescription
+      }
+    } else {
       serverRunning = false
-      errorMessage = error.localizedDescription
     }
     publishInfo()
     publishDownloads()
@@ -207,6 +216,8 @@ final class AppModel {
     deviceIdentity = DeviceIdentity(
       alias: settings.alias,
       fingerprint: identity.fingerprint,
+      deviceModel: settings.deviceModel,
+      deviceType: settings.deviceType,
       port: settings.port,
       protocolName: settings.encryption && !webReceiveMode && webSendFiles == nil ? "https" : "http"
     )
@@ -220,6 +231,7 @@ final class AppModel {
   private func configureServer() {
     server.identity = identity
     server.encryption = settings.encryption && !webReceiveMode && webSendFiles == nil
+    server.verifyChecksums = settings.verifyChecksums
     server.webUploadEnabled = webReceiveMode
     server.webSendEnabled = webSendFiles != nil
     server.pin = webSendFiles != nil || settings.pin.isEmpty ? nil : settings.pin
@@ -288,11 +300,13 @@ final class AppModel {
       let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
       let file = ReceivedFile(id: url.path, name: fileName, url: url, size: size, date: Date())
       receivedFiles.insert(file, at: 0)
-      history.add(
-        direction: .received,
-        alias: activePeerAlias.isEmpty ? "LocalSend Plus" : activePeerAlias,
-        files: [HistoryFile(name: fileName, size: Int64(size), relativePath: fileName)]
-      )
+      if settings.saveHistory {
+        history.add(
+          direction: .received,
+          alias: activePeerAlias.isEmpty ? "LocalSend Plus" : activePeerAlias,
+          files: [HistoryFile(name: fileName, size: Int64(size), relativePath: fileName)]
+        )
+      }
       if settings.saveToPhotos, PhotoSaver.isMedia(url) {
         Task { await PhotoSaver.save([url]) }
       }
@@ -302,7 +316,7 @@ final class AppModel {
       // The peer reached us, but its protocol is unknown: resolve it the same way a scan would.
       Task { [weak self] in
         guard let self else { return }
-        if let device = await DeviceProbe.info(host: peer.host, identity: self.identity) {
+        if let device = await DeviceProbe.info(host: peer.host, identity: self.identity, timeout: self.settings.discoveryTimeout) {
           self.discovery.absorb(device)
         }
       }
@@ -360,11 +374,13 @@ final class AppModel {
       }
       outgoing?.completed = outcome.uploaded
       outgoing?.isFinished = true
-      history.add(
-        direction: .sent,
-        alias: device.alias,
-        files: files.map { HistoryFile(name: $0.name, size: Int64($0.size), relativePath: nil) }
-      )
+      if settings.saveHistory {
+        history.add(
+          direction: .sent,
+          alias: device.alias,
+          files: files.map { HistoryFile(name: $0.name, size: Int64($0.size), relativePath: nil) }
+        )
+      }
     } catch let TransferError.pinRequired {
       outgoing = nil
       pinRequest = PinRequest(id: device.id, device: device, files: files)

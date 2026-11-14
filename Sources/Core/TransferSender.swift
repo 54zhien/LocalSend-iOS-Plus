@@ -140,7 +140,13 @@ struct TransferSender {
 
     var fileMap: [String: FileDTO] = [:]
     for file in files {
-      fileMap[file.id] = FileDTO(id: file.id, fileName: file.name, size: file.size, fileType: file.fileType)
+      fileMap[file.id] = FileDTO(
+        id: file.id,
+        fileName: file.name,
+        size: file.size,
+        fileType: file.fileType,
+        sha256: settings.createChecksums ? try FileHash.sha256(of: file.url) : nil
+      )
     }
 
     var prepareURL = base.appendingPathComponent("api/localsend/v2/prepare-upload")
