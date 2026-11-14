@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
 
 struct SendView: View {
   @Environment(AppModel.self) private var model
@@ -31,9 +32,9 @@ struct SendView: View {
           }
           .padding(15)
           .frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .top)
+          .background(NonBouncingScrollProbe())
         }
         .softTopScrollEdge()
-        .refreshable { await model.discovery.refresh() }
       }
       .background(AmbientBackground())
       .navigationTitle("Send")
@@ -325,7 +326,7 @@ struct SendView: View {
           HStack(spacing: 12) {
             Image(systemName: "desktopcomputer")
               .font(.title2)
-            Text(LocalizedStringKey(model.discovery.isScanning ? "Scanning the local network…" : "No device found yet. Pull to rescan."))
+            Text(LocalizedStringKey(model.discovery.isScanning ? "Scanning the local network…" : "No device found yet. Tap refresh to scan again."))
               .font(.subheadline)
           }
           .foregroundStyle(.secondary)
@@ -484,5 +485,36 @@ extension FavoriteDevice {
       lastSeen: Date(),
       protocolName: protocolName
     )
+  }
+}
+
+private struct NonBouncingScrollProbe: UIViewRepresentable {
+  func makeUIView(context: Context) -> ProbeView {
+    let view = ProbeView()
+    view.isUserInteractionEnabled = false
+    return view
+  }
+
+  func updateUIView(_ view: ProbeView, context: Context) {
+    view.disableBounce()
+  }
+
+  final class ProbeView: UIView {
+    override func didMoveToWindow() {
+      super.didMoveToWindow()
+      disableBounce()
+    }
+
+    func disableBounce() {
+      var ancestor = superview
+      while let view = ancestor {
+        if let scrollView = view as? UIScrollView {
+          scrollView.bounces = false
+          scrollView.alwaysBounceVertical = false
+          return
+        }
+        ancestor = view.superview
+      }
+    }
   }
 }

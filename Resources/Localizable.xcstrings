@@ -11371,6 +11371,16 @@
         }
       }
     },
+    "No device found yet. Tap refresh to scan again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未发现设备，点击刷新按钮重新扫描。"
+          }
+        }
+      }
+    },
     "Name": {
       "localizations": {
         "zh-Hans": {
