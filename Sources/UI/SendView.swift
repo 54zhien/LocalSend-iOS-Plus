@@ -57,7 +57,7 @@ struct SendView: View {
         )
       }
       .sheet(isPresented: $folderPickerPresented) {
-        FilePicker(contentTypes: [.folder], allowsMultipleSelection: false,
+        FilePicker(contentTypes: [.folder], allowsMultipleSelection: false, asCopy: false,
           onPick: { urls in
             model.selection.append(contentsOf: urls.flatMap(SelectionStaging.files(in:)))
             folderPickerPresented = false

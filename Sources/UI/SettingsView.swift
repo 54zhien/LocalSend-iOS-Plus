@@ -156,7 +156,6 @@ struct SettingsView: View {
       Toggle(LocalizedStringKey(title), isOn: isOn)
         .labelsHidden()
         .frame(width: 146, height: 46)
-        .materialControl()
     }
     .font(.subheadline)
   }

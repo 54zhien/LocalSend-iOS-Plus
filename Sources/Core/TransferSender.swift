@@ -144,6 +144,8 @@ struct TransferSender {
       var results: [String: String] = [:]
       if shouldHash {
         for target in hashTargets {
+          let scoped = target.url.startAccessingSecurityScopedResource()
+          defer { if scoped { target.url.stopAccessingSecurityScopedResource() } }
           results[target.id] = try FileHash.sha256(of: target.url)
         }
       }
