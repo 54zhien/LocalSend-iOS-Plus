@@ -61,6 +61,16 @@ final class FavoritesStore {
     save()
   }
 
+  func update(_ favorite: FavoriteDevice, from device: Device) {
+    guard let index = devices.firstIndex(where: { $0.fingerprint == favorite.fingerprint }) else { return }
+    devices[index].fingerprint = device.fingerprint
+    devices[index].host = device.host
+    devices[index].port = device.port
+    devices[index].deviceType = device.deviceType.rawValue
+    devices[index].protocolName = device.protocolName
+    save()
+  }
+
   func remove(fingerprint: String) {
     devices.removeAll { $0.fingerprint == fingerprint }
     save()

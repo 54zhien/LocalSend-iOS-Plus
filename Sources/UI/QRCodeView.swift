@@ -20,9 +20,9 @@ struct QRCodeView: View {
         .scaledToFit()
         .frame(width: size, height: size)
         .padding(12)
-        .background(.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(.white, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
     } else {
-      RoundedRectangle(cornerRadius: 18, style: .continuous)
+      RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
         .fill(.white.opacity(0.12))
         .frame(width: size, height: size)
         .overlay(Image(systemName: "qrcode").font(.system(size: 48)).foregroundStyle(.secondary))
@@ -120,25 +120,18 @@ final class ScannerViewController: UIViewController, AVCaptureMetadataOutputObje
     frame.translatesAutoresizingMaskIntoConstraints = false
     frame.layer.borderColor = UIColor.white.withAlphaComponent(0.8).cgColor
     frame.layer.borderWidth = 2
-    frame.layer.cornerRadius = 24
+    frame.layer.cornerRadius = AppRadius.control
     frame.layer.cornerCurve = .continuous
     view.addSubview(frame)
 
     let hint = UILabel()
     hint.translatesAutoresizingMaskIntoConstraints = false
-    hint.text = "Point the camera at the other device's pairing code"
+    hint.text = String(localized: "Point the camera at the other device's pairing code")
     hint.textColor = .white
     hint.font = .preferredFont(forTextStyle: .footnote)
     hint.numberOfLines = 0
     hint.textAlignment = .center
     view.addSubview(hint)
-
-    let close = UIButton(type: .system)
-    close.translatesAutoresizingMaskIntoConstraints = false
-    close.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
-    close.tintColor = .white
-    close.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
-    view.addSubview(close)
 
     NSLayoutConstraint.activate([
       frame.centerXAnchor.constraint(equalTo: view.centerXAnchor),
@@ -150,15 +143,7 @@ final class ScannerViewController: UIViewController, AVCaptureMetadataOutputObje
       hint.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
       hint.topAnchor.constraint(equalTo: frame.bottomAnchor, constant: 24),
 
-      close.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-      close.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
-      close.widthAnchor.constraint(equalToConstant: 32),
-      close.heightAnchor.constraint(equalToConstant: 32),
     ])
-  }
-
-  @objc private func cancelTapped() {
-    onCancel?()
   }
 
   func metadataOutput(

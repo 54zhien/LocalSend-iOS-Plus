@@ -51,6 +51,10 @@ final class AppModel {
     let files: [SelectedFile]
     var alias: String { device.alias }
   }
+  struct DownloadRequest: Identifiable {
+    let id: String
+    let peerIp: String
+  }
 
   let settings = AppSettings()
   let history = HistoryStore()
@@ -69,6 +73,7 @@ final class AppModel {
   var incoming: IncomingRequest?
   var outgoing: OutgoingTransfer?
   var pinRequest: PinRequest?
+  var downloadRequest: DownloadRequest?
   var errorMessage: String?
   /// Files staged for the next send, also filled by the Share Extension.
   var selection: [SelectedFile] = []
@@ -100,13 +105,21 @@ final class AppModel {
   private var activePeerAlias = ""
   private var activePeerFingerprint = ""
   private var started = false
+  private var webReceiveMode = false
+  private var webSendFiles: [SelectedFile]?
+  var isWebReceiving: Bool { webReceiveMode }
+  private var usesTLS: Bool {
+    settings.encryption && identity.identity != nil && !webReceiveMode && webSendFiles == nil
+  }
 
   init() {
     deviceIdentity = DeviceIdentity(
       alias: settings.alias,
       fingerprint: identity.fingerprint,
+      deviceModel: settings.deviceModel,
+      deviceType: settings.deviceType,
       port: settings.port,
-      protocolName: settings.encryption ? "https" : "http"
+      protocolName: settings.encryption && identity.identity != nil ? "https" : "http"
     )
   }
 
@@ -129,7 +142,7 @@ final class AppModel {
       errorMessage = error.localizedDescription
     }
 
-    discovery.start(identity: identity, ownFingerprint: identity.fingerprint, interval: settings.scanInterval)
+    discovery.start(identity: identity, ownFingerprint: identity.fingerprint, interval: settings.scanInterval, timeout: settings.discoveryTimeout)
     publishDownloads()
     startAnnouncing()
   }
@@ -162,6 +175,7 @@ final class AppModel {
     discovery.stop()
     server.stop()
     serverRunning = false
+    started = false
   }
 
   /// Re-applies settings that require restarting the listener.
@@ -169,17 +183,23 @@ final class AppModel {
     deviceIdentity = DeviceIdentity(
       alias: settings.alias,
       fingerprint: identity.fingerprint,
+      deviceModel: settings.deviceModel,
+      deviceType: settings.deviceType,
       port: settings.port,
-      protocolName: settings.encryption ? "https" : "http"
+      protocolName: usesTLS ? "https" : "http"
     )
     server.stop()
     configureServer()
-    do {
-      try server.start()
-      serverRunning = true
-    } catch {
+    if started {
+      do {
+        try server.start()
+        serverRunning = true
+      } catch {
+        serverRunning = false
+        errorMessage = error.localizedDescription
+      }
+    } else {
       serverRunning = false
-      errorMessage = error.localizedDescription
     }
     publishInfo()
     publishDownloads()
@@ -203,8 +223,10 @@ final class AppModel {
     deviceIdentity = DeviceIdentity(
       alias: settings.alias,
       fingerprint: identity.fingerprint,
+      deviceModel: settings.deviceModel,
+      deviceType: settings.deviceType,
       port: settings.port,
-      protocolName: settings.encryption ? "https" : "http"
+      protocolName: usesTLS ? "https" : "http"
     )
     publishInfo()
   }
@@ -215,10 +237,24 @@ final class AppModel {
 
   private func configureServer() {
     server.identity = identity
-    server.encryption = settings.encryption
-    server.pin = settings.pin.isEmpty ? nil : settings.pin
+    server.encryption = usesTLS
+    server.verifyChecksums = settings.verifyChecksums
+    server.webUploadEnabled = webReceiveMode
+    server.webSendEnabled = webSendFiles != nil
+    server.webSendAutoAccept = settings.shareViaLinkAutoAccept
+    server.pin = webSendFiles != nil || settings.pin.isEmpty ? nil : settings.pin
     server.port = settings.port
-    server.downloadProvider = settings.downloadEnabled ? { [downloadBox] in downloadBox.value } : nil
+    if let webSendFiles {
+      let files = webSendFiles.map {
+        FileDTO(id: $0.id, fileName: $0.name, size: $0.size, fileType: $0.fileType)
+      }
+      let urls = Dictionary(uniqueKeysWithValues: webSendFiles.map { ($0.id, $0.url) })
+      server.downloadProvider = { files }
+      server.downloadURLProvider = { urls[$0.id] }
+    } else {
+      server.downloadProvider = settings.downloadEnabled ? { [downloadBox] in downloadBox.value } : nil
+      server.downloadURLProvider = nil
+    }
     server.identityProvider = { [infoBox] in infoBox.value }
     let destinationBox = destination.box
     server.destinationProvider = { destinationBox.value ?? LocalHTTPServer.downloadsDirectory() }
@@ -227,6 +263,32 @@ final class AppModel {
         self?.handle(event)
       }
     }
+  }
+
+  func beginWebReceive() {
+    guard !webReceiveMode else { return }
+    webReceiveMode = true
+    applyNetworkSettings()
+  }
+
+  func endWebReceive() {
+    guard webReceiveMode else { return }
+    webReceiveMode = false
+    applyNetworkSettings()
+  }
+
+  func beginWebSend(files: [SelectedFile]) {
+    guard !files.isEmpty else { return }
+    webSendFiles = files
+    applyNetworkSettings()
+  }
+
+  func endWebSend() {
+    guard webSendFiles != nil else { return }
+    if let downloadRequest { server.decideDownload(id: downloadRequest.id, accepted: false) }
+    downloadRequest = nil
+    webSendFiles = nil
+    applyNetworkSettings()
   }
 
   // MARK: Server events
@@ -248,11 +310,13 @@ final class AppModel {
       let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
       let file = ReceivedFile(id: url.path, name: fileName, url: url, size: size, date: Date())
       receivedFiles.insert(file, at: 0)
-      history.add(
-        direction: .received,
-        alias: activePeerAlias.isEmpty ? "LocalSend Plus" : activePeerAlias,
-        files: [HistoryFile(name: fileName, size: Int64(size), relativePath: fileName)]
-      )
+      if settings.saveHistory {
+        history.add(
+          direction: .received,
+          alias: activePeerAlias.isEmpty ? "LocalSend Plus" : activePeerAlias,
+          files: [HistoryFile(name: fileName, size: Int64(size), relativePath: fileName)]
+        )
+      }
       if settings.saveToPhotos, PhotoSaver.isMedia(url) {
         Task { await PhotoSaver.save([url]) }
       }
@@ -262,17 +326,24 @@ final class AppModel {
       // The peer reached us, but its protocol is unknown: resolve it the same way a scan would.
       Task { [weak self] in
         guard let self else { return }
-        if let device = await DeviceProbe.info(host: peer.host, identity: self.identity) {
+        if let device = await DeviceProbe.info(host: peer.host, identity: self.identity, timeout: self.settings.discoveryTimeout) {
           self.discovery.absorb(device)
         }
       }
+    case let .downloadRequested(id, peerIp):
+      downloadRequest = DownloadRequest(id: id, peerIp: peerIp)
     }
+  }
+
+  func decideDownload(_ request: DownloadRequest, accepted: Bool) {
+    server.decideDownload(id: request.id, accepted: accepted)
+    if downloadRequest?.id == request.id { downloadRequest = nil }
   }
 
   // MARK: Receiving
 
-  func accept(_ request: IncomingRequest) {
-    server.decide(sessionId: request.id, acceptedIds: Set(request.files.map(\.id)))
+  func accept(_ request: IncomingRequest, acceptedIds: Set<String>? = nil) {
+    server.decide(sessionId: request.id, acceptedIds: acceptedIds ?? Set(request.files.map(\.id)))
     if incoming?.id == request.id { incoming = nil }
   }
 
@@ -285,22 +356,44 @@ final class AppModel {
 
   func send(files: [SelectedFile], to device: Device, pin: String? = nil) {
     guard !files.isEmpty else { return }
+    beginOutgoing(files: files, alias: device.alias)
 
-    let transfer = OutgoingTransfer(
+    Task { [weak self] in
+      guard let self else { return }
+      await self.performSend(files: files, to: device, pin: pin)
+    }
+  }
+
+  func send(files: [SelectedFile], to favorite: FavoriteDevice) {
+    guard !files.isEmpty else { return }
+    beginOutgoing(files: files, alias: favorite.alias)
+    Task { [weak self] in
+      guard let self else { return }
+      guard let resolved = await DeviceProbe.info(
+        host: favorite.host,
+        port: favorite.port,
+        identity: identity,
+        timeout: max(2, settings.discoveryTimeout)
+      ) else {
+        outgoing?.isFinished = true
+        outgoing?.error = String(localized: "Cannot connect to the favourite device.")
+        return
+      }
+      favorites.update(favorite, from: resolved)
+      await performSend(files: files, to: resolved)
+    }
+  }
+
+  private func beginOutgoing(files: [SelectedFile], alias: String) {
+    outgoing = OutgoingTransfer(
       id: UUID().uuidString,
-      deviceAlias: device.alias,
+      deviceAlias: alias,
       fileNames: files.map(\.name),
       completed: 0,
       total: files.count,
       isFinished: false,
       error: nil
     )
-    outgoing = transfer
-
-    Task { [weak self] in
-      guard let self else { return }
-      await self.performSend(files: files, to: device, pin: pin)
-    }
   }
 
   private func performSend(files: [SelectedFile], to device: Device, pin: String? = nil) async {
@@ -320,18 +413,19 @@ final class AppModel {
       }
       outgoing?.completed = outcome.uploaded
       outgoing?.isFinished = true
-      history.add(
-        direction: .sent,
-        alias: device.alias,
-        files: files.map { HistoryFile(name: $0.name, size: Int64($0.size), relativePath: nil) }
-      )
+      if settings.saveHistory {
+        history.add(
+          direction: .sent,
+          alias: device.alias,
+          files: files.map { HistoryFile(name: $0.name, size: Int64($0.size), relativePath: nil) }
+        )
+      }
     } catch let TransferError.pinRequired {
       outgoing = nil
       pinRequest = PinRequest(id: device.id, device: device, files: files)
     } catch {
       outgoing?.isFinished = true
       outgoing?.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-      errorMessage = outgoing?.error
     }
   }
 

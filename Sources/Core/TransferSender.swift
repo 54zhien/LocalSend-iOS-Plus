@@ -12,12 +12,12 @@ enum TransferError: LocalizedError {
 
   var errorDescription: String? {
     switch self {
-    case .declined: return "The receiver declined the transfer."
-    case .pinRequired: return "The receiver requires a PIN."
-    case .tooManyAttempts: return "Too many wrong PIN attempts. Try again later."
-    case .blocked: return "The receiver is busy with another session."
-    case .noFiles: return "Select at least one file."
-    case .cancelled: return "The transfer was cancelled."
+    case .declined: return String(localized: "The receiver declined the transfer.")
+    case .pinRequired: return String(localized: "The receiver requires a PIN.")
+    case .tooManyAttempts: return String(localized: "Too many wrong PIN attempts. Try again later.")
+    case .blocked: return String(localized: "The receiver is busy with another session.")
+    case .noFiles: return String(localized: "Select at least one file.")
+    case .cancelled: return String(localized: "The transfer was cancelled.")
     case let .http(status, message): return "HTTP \(status): \(message)"
     }
   }
@@ -138,9 +138,29 @@ struct TransferSender {
     }
     let info = own.infoDTO(downloadEnabled: settings.downloadEnabled)
 
+    let shouldHash = settings.createChecksums
+    let hashTargets = files.map { (id: $0.id, url: $0.url) }
+    let hashes = try await Task.detached(priority: .userInitiated) {
+      var results: [String: String] = [:]
+      if shouldHash {
+        for target in hashTargets {
+          let scoped = target.url.startAccessingSecurityScopedResource()
+          defer { if scoped { target.url.stopAccessingSecurityScopedResource() } }
+          results[target.id] = try FileHash.sha256(of: target.url)
+        }
+      }
+      return results
+    }.value
+
     var fileMap: [String: FileDTO] = [:]
     for file in files {
-      fileMap[file.id] = FileDTO(id: file.id, fileName: file.name, size: file.size, fileType: file.fileType)
+      fileMap[file.id] = FileDTO(
+        id: file.id,
+        fileName: file.name,
+        size: file.size,
+        fileType: file.fileType,
+        sha256: hashes[file.id]
+      )
     }
 
     var prepareURL = base.appendingPathComponent("api/localsend/v2/prepare-upload")

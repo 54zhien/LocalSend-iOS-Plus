@@ -7,10 +7,10 @@ struct IncomingApprovalSheet: View {
   @State private var selected: Set<String>
 
   let request: IncomingRequest
-  let onAccept: () -> Void
+  let onAccept: (Set<String>) -> Void
   let onDecline: () -> Void
 
-  init(request: IncomingRequest, onAccept: @escaping () -> Void, onDecline: @escaping () -> Void) {
+  init(request: IncomingRequest, onAccept: @escaping (Set<String>) -> Void, onDecline: @escaping () -> Void) {
     self.request = request
     self.onAccept = onAccept
     self.onDecline = onDecline
@@ -41,8 +41,8 @@ struct IncomingApprovalSheet: View {
           }
         }
         ToolbarItem(placement: .confirmationAction) {
-          Button(selected.isEmpty ? "Accept" : "Accept \(selected.count)") {
-            onAccept()
+          Button(selected.isEmpty ? String(localized: "Accept") : "\(String(localized: "Accept")) \(selected.count)") {
+            onAccept(selected)
             dismiss()
           }
           .disabled(selected.isEmpty)
@@ -60,7 +60,7 @@ struct IncomingApprovalSheet: View {
           .foregroundStyle(.tint)
         Text(request.peerAlias)
           .font(.title3.weight(.semibold))
-        Text("wants to send \(request.files.count) file\(request.files.count == 1 ? "" : "s") · \(totalSize.formattedSize)")
+        Text("\(String(localized: "Wants to send")) · \(request.files.count) · \(totalSize.formattedSize)")
           .font(.subheadline)
           .foregroundStyle(.secondary)
           .multilineTextAlignment(.center)
@@ -126,7 +126,9 @@ struct PinPromptSheet: View {
               .font(.subheadline)
               .foregroundStyle(.secondary)
             TextField("PIN", text: $pin)
-              .textFieldStyle(.roundedBorder)
+              .textFieldStyle(.plain)
+              .padding(12)
+              .glassPanel()
               .keyboardType(.numberPad)
               .focused($focused)
               .multilineTextAlignment(.center)

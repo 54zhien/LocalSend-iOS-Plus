@@ -8,6 +8,7 @@ enum ServerEvent {
   case incoming(sessionId: String, peerAlias: String, peerFingerprint: String, files: [FileDTO])
   case received(fileName: String, url: URL)
   case peerSeen(PeerDescription)
+  case downloadRequested(id: String, peerIp: String)
 
   struct PeerDescription {
     let alias: String
@@ -46,6 +47,7 @@ final class LocalHTTPServer {
   private var activeSessionId: String?
   private var pinFailures: [String: Int] = [:]
   private var downloadSession: (id: String, files: [String: FileDTO], tokens: [String: String])?
+  private var pendingDownloads: [String: HTTPConnection] = [:]
 
   private(set) var isRunning = false
   var port: Int = 53317
@@ -55,6 +57,11 @@ final class LocalHTTPServer {
   var pin: String?
   /// `nil` disables the web download API; otherwise the files offered to browsers.
   var downloadProvider: (() -> [FileDTO])?
+  var downloadURLProvider: ((FileDTO) -> URL?)?
+  var webUploadEnabled = false
+  var webSendEnabled = false
+  var webSendAutoAccept = false
+  var verifyChecksums = true
   /// Where received files are written; falls back to `Documents/LocalSend`.
   var destinationProvider: (() -> URL)?
   var onEvent: ((ServerEvent) -> Void)?
@@ -109,6 +116,7 @@ final class LocalHTTPServer {
     listener = nil
     isRunning = false
     sessions.removeAll()
+    pendingDownloads.removeAll()
     activeSessionId = nil
   }
 
@@ -160,6 +168,13 @@ final class LocalHTTPServer {
     switch (method, pathOnly) {
     case ("GET", "/"), ("GET", "/index.html"):
       handleDownloadPage(connection: connection)
+
+    case ("GET", "/web/files"):
+      if webSendEnabled, let files = downloadProvider?() {
+        connection.respondJSON(status: 200, value: files)
+      } else {
+        connection.respondJSON(status: 404, value: ["message": "not found"])
+      }
 
     case ("GET", "/api/localsend/v2/info"), ("GET", "/api/localsend/v1/info"):
       connection.respondJSON(status: 200, value: identityProvider())
@@ -297,7 +312,17 @@ final class LocalHTTPServer {
     sessions[sessionId] = session
 
     connection.beginFileUpload(handle: handle.handle, url: handle.url) { [weak self] name, url in
-      guard let self else { return }
+      guard let self else { return false }
+      if self.verifyChecksums, let expected = file.sha256 {
+        guard let actual = try? FileHash.sha256(of: url),
+          actual.caseInsensitiveCompare(expected) == .orderedSame
+        else {
+          try? FileManager.default.removeItem(at: url)
+          self.sessions.removeValue(forKey: sessionId)
+          self.activeSessionId = nil
+          return false
+        }
+      }
       self.onEvent?(.received(fileName: name, url: url))
 
       self.queue.async {
@@ -308,6 +333,7 @@ final class LocalHTTPServer {
           self.activeSessionId = nil
         }
       }
+      return true
     }
   }
 
@@ -322,16 +348,37 @@ final class LocalHTTPServer {
       return
     }
 
+    if webSendEnabled && !webSendAutoAccept && !pendingDownloads.isEmpty {
+      connection.respondJSON(status: 409, value: ["message": "Another download request is pending"])
+      return
+    }
+
     let files = downloadProvider()
     var tokens: [String: String] = [:]
     for file in files { tokens[file.id] = UUID().uuidString }
     let sessionId = UUID().uuidString
     downloadSession = (sessionId, Dictionary(uniqueKeysWithValues: files.map { ($0.id, $0) }), tokens)
 
-    connection.respondJSON(
-      status: 200,
-      value: PrepareUploadResponse(sessionId: sessionId, files: tokens)
-    )
+    if webSendEnabled && !webSendAutoAccept {
+      pendingDownloads[sessionId] = connection
+      onEvent?(.downloadRequested(id: sessionId, peerIp: connection.peerAddress))
+    } else {
+      connection.respondJSON(
+        status: 200,
+        value: PrepareUploadResponse(sessionId: sessionId, files: tokens)
+      )
+    }
+  }
+
+  func decideDownload(id: String, accepted: Bool) {
+    queue.async { [weak self] in
+      guard let self, let connection = self.pendingDownloads.removeValue(forKey: id) else { return }
+      guard accepted, let session = self.downloadSession, session.id == id else {
+        connection.respondJSON(status: 403, value: ["message": "Download declined"])
+        return
+      }
+      connection.respondJSON(status: 200, value: PrepareUploadResponse(sessionId: id, files: session.tokens))
+    }
   }
 
   private func handleDownload(connection: HTTPConnection, path: String) {
@@ -355,6 +402,20 @@ final class LocalHTTPServer {
   }
 
   private func handleDownloadPage(connection: HTTPConnection) {
+    if webSendEnabled,
+      let url = Bundle.main.url(forResource: "web-download", withExtension: "html"),
+      let body = try? Data(contentsOf: url)
+    {
+      connection.respond(status: 200, body: body, contentType: "text/html; charset=utf-8")
+      return
+    }
+    if webUploadEnabled,
+      let url = Bundle.main.url(forResource: "web-upload", withExtension: "html"),
+      let body = try? Data(contentsOf: url)
+    {
+      connection.respond(status: 200, body: body, contentType: "text/html; charset=utf-8")
+      return
+    }
     guard downloadProvider != nil else {
       connection.respondJSON(status: 404, value: ["message": "not found"])
       return
@@ -363,6 +424,7 @@ final class LocalHTTPServer {
   }
 
   private func downloadURL(for file: FileDTO) -> URL? {
+    if let url = downloadURLProvider?(file) { return url }
     let directory = Self.downloadsDirectory()
     let candidate = directory.appendingPathComponent(file.fileName)
     return FileManager.default.fileExists(atPath: candidate.path) ? candidate : nil
@@ -449,7 +511,7 @@ final class HTTPConnection {
   private var didRespond = false
   private var prefetched = Data()
   private var isClosed = false
-  private var onFinish: ((String, URL) -> Void)?
+  private var onFinish: ((String, URL) -> Bool)?
 
   private static let headerTerminator = Data("\r\n\r\n".utf8)
 
@@ -536,7 +598,7 @@ final class HTTPConnection {
 
   // MARK: Upload sink
 
-  func beginFileUpload(handle: FileHandle, url: URL, onFinish: @escaping (String, URL) -> Void) {
+  func beginFileUpload(handle: FileHandle, url: URL, onFinish: @escaping (String, URL) -> Bool) {
     fileHandle = handle
     fileURL = url
     remaining = bodyLength
@@ -562,10 +624,8 @@ final class HTTPConnection {
   private func finishUpload() {
     fileHandle?.closeFile()
     fileHandle = nil
-    if let url = fileURL {
-      onFinish?(url.lastPathComponent, url)
-    }
-    respond(status: 200, body: Data(), contentType: "application/octet-stream")
+    let valid = fileURL.map { onFinish?($0.lastPathComponent, $0) ?? false } ?? false
+    respond(status: valid ? 200 : 422, body: Data(), contentType: "application/octet-stream")
   }
 
   private func parseHeaders(_ raw: String) {
@@ -604,6 +664,7 @@ final class HTTPConnection {
     case 403: reason = "Forbidden"
     case 404: reason = "Not Found"
     case 409: reason = "Conflict"
+    case 422: reason = "Unprocessable Content"
     case 429: reason = "Too Many Requests"
     case 500: reason = "Internal Server Error"
     default: reason = "OK"

@@ -1,0 +1,3 @@
+"NSLocalNetworkUsageDescription" = "LocalSend Plus 需要访问局域网，以发现附近设备并收发文件。";
+"NSPhotoLibraryAddUsageDescription" = "LocalSend Plus 仅在你选择保存收到的照片或视频时写入相册。";
+"NSCameraUsageDescription" = "LocalSend Plus 仅使用相机扫描其他设备的配对二维码。";

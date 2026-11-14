@@ -63,6 +63,7 @@ struct DeviceIdentity {
   var alias: String
   var fingerprint: String
   var deviceModel: String = UIDevice.current.model
+  var deviceType: DeviceType = .mobile
   var version = "2.2"
   var port = 53317
   /// `https` when encryption is enabled — the server then speaks TLS.
@@ -76,7 +77,7 @@ struct DeviceIdentity {
       alias: alias,
       version: version,
       deviceModel: deviceModel,
-      deviceType: DeviceType.mobile.rawValue,
+      deviceType: deviceType.rawValue,
       fingerprint: fingerprint,
       port: port,
       protocolName: protocolName,
@@ -89,7 +90,7 @@ struct DeviceIdentity {
       alias: alias,
       version: version,
       deviceModel: deviceModel,
-      deviceType: DeviceType.mobile.rawValue,
+      deviceType: deviceType.rawValue,
       fingerprint: fingerprint,
       port: port,
       protocolName: protocolName,

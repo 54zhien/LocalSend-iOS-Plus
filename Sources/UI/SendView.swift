@@ -1,68 +1,109 @@
+import QuickLook
+import QuickLookThumbnailing
 import SwiftUI
+import UniformTypeIdentifiers
+import UIKit
 
 struct SendView: View {
   @Environment(AppModel.self) private var model
 
   @State private var importerPresented = false
+  @State private var folderPickerPresented = false
+  @State private var mediaPickerPresented = false
+  @State private var textSheetPresented = false
+  @State private var textDraft = ""
   @State private var favoriteSheetPresented = false
-  @State private var importError: String?
   @State private var scannerPresented = false
   @State private var detailsDevice: Device?
+  @State private var webSendPresented = false
+  @State private var webSendFiles: [SelectedFile] = []
+  @State private var pendingWebSend = false
+  @State private var sendModeHelpPresented = false
+  @State private var previewURL: URL?
+  @State private var scopedPreviewURLs: [URL] = []
 
   var body: some View {
     @Bindable var model = model
 
     NavigationStack {
-      ScrollView {
-        VStack(spacing: 18) {
-          selectionCard(model: model)
-          if !model.favorites.devices.isEmpty { favoritesCard }
-          devicesCard
+      GeometryReader { geometry in
+        ScrollView {
+          VStack(spacing: 18) {
+            selectionCard(model: model)
+            if !model.favorites.devices.isEmpty { favoritesCard }
+            devicesCard
+            Spacer(minLength: 0)
+          }
+          .padding(15)
+          .frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .top)
+          .background(NonBouncingScrollProbe())
         }
-        .padding(20)
+        .softTopScrollEdge()
       }
       .background(AmbientBackground())
       .navigationTitle("Send")
-      .toolbar {
-        ToolbarItem(placement: .topBarTrailing) {
-          Button {
-            scannerPresented = true
-          } label: {
-            Image(systemName: "qrcode.viewfinder")
+      .toolbar(.hidden, for: .navigationBar)
+      .sheet(isPresented: $importerPresented) {
+        FilePicker(
+          onPick: { urls in
+            model.selection.append(contentsOf: urls.compactMap(SelectedFile.make(from:)))
+            importerPresented = false
+            if pendingWebSend && !model.selection.isEmpty {
+              webSendFiles = model.selection
+              webSendPresented = true
+            }
+            pendingWebSend = false
+          },
+          onCancel: {
+            importerPresented = false
+            pendingWebSend = false
           }
-        }
-        ToolbarItem(placement: .topBarTrailing) {
-          Button {
-            favoriteSheetPresented = true
-          } label: {
-            Image(systemName: "star")
-          }
+        )
+      }
+      .sheet(isPresented: $folderPickerPresented) {
+        FilePicker(contentTypes: [.folder], allowsMultipleSelection: false, asCopy: false,
+          onPick: { urls in
+            model.selection.append(contentsOf: urls.flatMap(SelectionStaging.files(in:)))
+            folderPickerPresented = false
+          },
+          onCancel: { folderPickerPresented = false }
+        )
+      }
+      .sheet(isPresented: $mediaPickerPresented) {
+        MediaPicker(onPick: { urls in
+          model.selection.append(contentsOf: urls.compactMap(SelectedFile.make(from:)))
+          mediaPickerPresented = false
+        }, onCancel: { mediaPickerPresented = false })
+      }
+      .sheet(isPresented: $textSheetPresented) {
+        NavigationStack {
+          TextEditor(text: $textDraft)
+            .padding(12)
+            .navigationTitle("Text")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+              ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { textSheetPresented = false }
+              }
+              ToolbarItem(placement: .confirmationAction) {
+                Button("Add") {
+                  do { model.selection.append(try SelectionStaging.text(textDraft)) }
+                  catch { model.errorMessage = error.localizedDescription }
+                  textSheetPresented = false
+                }
+                .disabled(textDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+              }
+            }
         }
       }
-      .refreshable { await model.discovery.scan() }
-      .fileImporter(
-        isPresented: $importerPresented,
-        allowedContentTypes: [.item],
-        allowsMultipleSelection: true
-      ) { result in
-        switch result {
-        case let .success(urls):
-          model.selection = urls.compactMap(SelectedFile.make(from:))
-        case let .failure(error):
-          importError = error.localizedDescription
-        }
+      .sheet(isPresented: $webSendPresented) {
+        WebSendView(files: webSendFiles)
+          .presentationDetents([.large])
       }
-      .alert(
-        "Cannot add file",
-        isPresented: Binding(
-          get: { importError != nil },
-          set: { if !$0 { importError = nil } }
-        ),
-        presenting: importError
-      ) { _ in
-        Button("OK", role: .cancel) {}
-      } message: { message in
-        Text(message)
+      .alert("Send mode", isPresented: $sendModeHelpPresented) {
+        Button("Done", role: .cancel) {}
+      } message: {
+        Text("Single sends to one device. Multiple keeps the selection so you can send it to several devices. Share via link lets browsers download the selection.")
       }
       .sheet(isPresented: $favoriteSheetPresented) {
         AddFavoriteSheet { alias, host in
@@ -73,50 +114,86 @@ struct SendView: View {
         DeviceDetailsSheet(device: device)
       }
       .sheet(isPresented: $scannerPresented) {
-        QRScannerView(
-          onCode: { code in
-            handleScanned(code: code, model: model)
-          },
-          onCancel: { scannerPresented = false }
-        )
-        .ignoresSafeArea()
+        ZStack(alignment: .topTrailing) {
+          QRScannerView(
+            onCode: { code in
+              handleScanned(code: code, model: model)
+            },
+            onCancel: { scannerPresented = false }
+          )
+          .ignoresSafeArea()
+          Button { scannerPresented = false } label: {
+            Image(systemName: "xmark")
+              .font(.system(size: 18, weight: .semibold))
+              .foregroundStyle(.white)
+              .frame(width: 48, height: 48)
+              .glassPanel(cornerRadius: 24, interactive: true)
+          }
+          .buttonStyle(.plain)
+          .padding(.top, 12)
+          .padding(.trailing, 20)
+        }
+        .preferredColorScheme(.dark)
+      }
+      .quickLookPreview($previewURL, in: model.selection.map(\.url))
+      .onChange(of: previewURL) { _, newValue in
+        if newValue == nil { releasePreviewAccess() }
       }
     }
   }
 
+  @ViewBuilder
   private func selectionCard(model: AppModel) -> some View {
-    GlassCard {
-      VStack(alignment: .leading, spacing: 12) {
+    if model.selection.isEmpty {
+      VStack(alignment: .leading, spacing: 14) {
+        SectionHeader(title: "Selection")
+        HStack(spacing: 8) {
+          selectionButton("Media", symbol: "photo") { mediaPickerPresented = true }
+          selectionButton("Text", symbol: "text.alignleft") { textSheetPresented = true }
+          selectionButton("Clipboard", symbol: "doc.on.clipboard") {
+            do {
+              let files = try SelectionStaging.clipboard()
+              if files.isEmpty { model.errorMessage = String(localized: "Clipboard is empty") }
+              model.selection.append(contentsOf: files)
+            } catch { model.errorMessage = error.localizedDescription }
+          }
+          selectionButton("File", symbol: "doc") { importerPresented = true }
+          selectionButton("Folder", symbol: "folder") { folderPickerPresented = true }
+        }
+      }
+    } else {
+      GlassCard(cornerRadius: AppRadius.control) {
+        VStack(alignment: .leading, spacing: 12) {
         HStack {
           SectionHeader(title: "Selection")
           Spacer(minLength: 0)
-          if !model.selection.isEmpty {
-            Button("Clear") { model.selection = [] }
-              .font(.footnote)
-          }
+          Button("Clear") { model.selection = [] }
+            .font(.footnote)
         }
 
-        if model.selection.isEmpty {
-          Text("Pick files or photos to send, or share into LocalSend from another app.")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        } else {
           ForEach(model.selection) { file in
             HStack(spacing: 12) {
-              Image(systemName: "doc.fill")
-                .font(.system(size: 18))
-                .foregroundStyle(.tint)
-                .frame(width: 34, height: 34)
-                .glassPanel(cornerRadius: 10)
-              VStack(alignment: .leading, spacing: 2) {
-                Text(file.name)
-                  .font(.subheadline.weight(.medium))
-                  .lineLimit(1)
-                Text(Int64(file.size).formattedSize)
-                  .font(.caption)
-                  .foregroundStyle(.secondary)
+              Button {
+                openPreview(file)
+              } label: {
+                HStack(spacing: 12) {
+                  SelectedFileThumbnail(file: file)
+                  VStack(alignment: .leading, spacing: 2) {
+                    Text(file.name)
+                      .font(.subheadline.weight(.medium))
+                      .lineLimit(1)
+                    Text(Int64(file.size).formattedSize)
+                      .font(.caption)
+                      .foregroundStyle(.secondary)
+                  }
+                  Spacer(minLength: 0)
+                  Image(systemName: "eye")
+                    .font(.subheadline)
+                    .foregroundStyle(.tint)
+                }
+                .contentShape(Rectangle())
               }
-              Spacer(minLength: 0)
+              .buttonStyle(.plain)
               Button {
                 model.selection.removeAll { $0.id == file.id }
               } label: {
@@ -127,10 +204,9 @@ struct SendView: View {
             }
           }
 
-          Text("\(model.selection.count) file\(model.selection.count == 1 ? "" : "s") · \(model.selectionBytes.formattedSize)")
+          Text("\(model.selection.count) · \(model.selectionBytes.formattedSize)")
             .font(.caption)
             .foregroundStyle(.secondary)
-        }
 
         Button {
           importerPresented = true
@@ -138,8 +214,38 @@ struct SendView: View {
           Label("Add files", systemImage: "plus")
         }
         .buttonStyle(GlassProminentButtonStyle())
+        }
       }
     }
+  }
+
+  private func openPreview(_ file: SelectedFile) {
+    releasePreviewAccess()
+    scopedPreviewURLs = model.selection.compactMap { selected in
+      selected.url.startAccessingSecurityScopedResource() ? selected.url : nil
+    }
+    previewURL = file.url
+  }
+
+  private func releasePreviewAccess() {
+    scopedPreviewURLs.forEach { $0.stopAccessingSecurityScopedResource() }
+    scopedPreviewURLs = []
+  }
+
+  private func selectionButton(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      VStack(spacing: 7) {
+        Image(systemName: symbol).font(.system(size: 20, weight: .medium))
+        Text(LocalizedStringKey(title))
+          .font(.system(size: 13, weight: .medium))
+          .lineLimit(1)
+          .minimumScaleFactor(0.78)
+      }
+      .frame(maxWidth: .infinity)
+      .frame(height: 76)
+      .glassPanel(interactive: true)
+    }
+    .buttonStyle(.plain)
   }
 
   private var favoritesCard: some View {
@@ -152,7 +258,7 @@ struct SendView: View {
               .font(.system(size: 18))
               .foregroundStyle(.yellow)
               .frame(width: 46, height: 46)
-              .glassPanel(cornerRadius: 14)
+              .glassPanel(cornerRadius: AppRadius.control)
 
             VStack(alignment: .leading, spacing: 2) {
               Text(favorite.alias)
@@ -165,7 +271,7 @@ struct SendView: View {
             Spacer(minLength: 0)
 
             Button {
-              send(to: favorite.asDevice)
+              send(to: favorite)
             } label: {
               Image(systemName: "paperplane.fill")
                 .foregroundStyle(model.selection.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
@@ -189,20 +295,73 @@ struct SendView: View {
   }
 
   private var devicesCard: some View {
-    GlassCard {
-      VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: 12) {
         HStack {
           SectionHeader(title: "Nearby")
           Spacer(minLength: 0)
           if model.discovery.isScanning {
             ProgressView().controlSize(.small)
           }
+          Button {
+            Task { await model.discovery.scan() }
+          } label: {
+            Image(systemName: "arrow.triangle.2.circlepath")
+          }
+          .accessibilityLabel("Scan now")
+          Button { scannerPresented = true } label: {
+            Image(systemName: "qrcode.viewfinder")
+          }
+          .accessibilityLabel("Scan QR code")
+          Button { favoriteSheetPresented = true } label: {
+            Image(systemName: "heart.fill")
+          }
+          .accessibilityLabel("Add favourite")
+          Menu {
+            Button {
+              model.settings.sendMode = .single
+            } label: {
+              Label("Single recipient", systemImage: model.settings.sendMode == .single ? "checkmark.circle.fill" : "circle")
+            }
+            Button {
+              model.settings.sendMode = .multiple
+            } label: {
+              Label("Multiple recipients", systemImage: model.settings.sendMode == .multiple ? "checkmark.circle.fill" : "circle")
+            }
+            Button {
+              if model.selection.isEmpty {
+                pendingWebSend = true
+                importerPresented = true
+              } else {
+                webSendFiles = model.selection
+                webSendPresented = true
+              }
+            } label: {
+              Label("Share via link", systemImage: "link")
+            }
+            Divider()
+            Button {
+              sendModeHelpPresented = true
+            } label: {
+              Label("Send mode help", systemImage: "questionmark.circle")
+            }
+          } label: {
+            Image(systemName: "gearshape.fill")
+          }
+          .accessibilityLabel("Send mode")
         }
 
         if model.discovery.devices.isEmpty {
-          Text(model.discovery.isScanning ? "Scanning the local network…" : "No device found yet. Pull to rescan.")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
+          HStack(spacing: 12) {
+            Image(systemName: "desktopcomputer")
+              .font(.title2)
+            Text(LocalizedStringKey(model.discovery.isScanning ? "Scanning the local network…" : "No device found yet. Tap refresh to scan again."))
+              .font(.subheadline)
+          }
+          .foregroundStyle(.secondary)
+          .opacity(0.45)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(16)
+          .glassPanel(cornerRadius: AppRadius.control)
         } else {
           ForEach(model.discovery.devices) { device in
             Button {
@@ -213,7 +372,7 @@ struct SendView: View {
                   .font(.system(size: 20))
                   .foregroundStyle(.tint)
                   .frame(width: 46, height: 46)
-                  .glassPanel(cornerRadius: 14)
+                  .glassPanel(cornerRadius: AppRadius.control)
 
                 VStack(alignment: .leading, spacing: 2) {
                   Text(device.alias)
@@ -233,6 +392,8 @@ struct SendView: View {
             }
             .buttonStyle(.plain)
             .disabled(model.selection.isEmpty)
+            .padding(10)
+            .glassPanel(cornerRadius: AppRadius.control, interactive: true)
             .contextMenu {
               Button {
                 detailsDevice = device
@@ -256,15 +417,29 @@ struct SendView: View {
             }
           }
         }
-      }
     }
   }
 
   private func send(to device: Device) {
     let files = model.selection
     guard !files.isEmpty else { return }
-    model.selection = []
+    if model.outgoing != nil {
+      model.errorMessage = String(localized: "Finish the current transfer first.")
+      return
+    }
+    if model.settings.sendMode == .single { model.selection = [] }
     model.send(files: files, to: device)
+  }
+
+  private func send(to favorite: FavoriteDevice) {
+    let files = model.selection
+    guard !files.isEmpty else { return }
+    if model.outgoing != nil {
+      model.errorMessage = String(localized: "Finish the current transfer first.")
+      return
+    }
+    if model.settings.sendMode == .single { model.selection = [] }
+    model.send(files: files, to: favorite)
   }
 
   /// A scanned LocalSend code is either a pairing URL or a bare host.
@@ -290,16 +465,20 @@ struct AddFavoriteSheet: View {
   var body: some View {
     NavigationStack {
       VStack(spacing: 16) {
-        GlassCard {
-          VStack(alignment: .leading, spacing: 12) {
-            TextField("Name", text: $alias)
-              .textFieldStyle(.roundedBorder)
-            TextField("192.168.178.20", text: $host)
-              .textFieldStyle(.roundedBorder)
-              .keyboardType(.decimalPad)
-              .autocorrectionDisabled()
-          }
+        VStack(spacing: 0) {
+          TextField("Name", text: $alias)
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 22)
+            .frame(height: 54)
+          Divider().padding(.horizontal, 22)
+          TextField("192.168.178.20", text: $host)
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 22)
+            .frame(height: 54)
+            .keyboardType(.decimalPad)
+            .autocorrectionDisabled()
         }
+        .background(.regularMaterial, in: Capsule())
         Spacer(minLength: 0)
       }
       .padding(20)
@@ -320,6 +499,7 @@ struct AddFavoriteSheet: View {
       }
     }
     .presentationDetents([.height(300)])
+    .presentationCornerRadius(55)
   }
 }
 
@@ -334,5 +514,76 @@ extension FavoriteDevice {
       lastSeen: Date(),
       protocolName: protocolName
     )
+  }
+}
+
+private struct NonBouncingScrollProbe: UIViewRepresentable {
+  func makeUIView(context: Context) -> ProbeView {
+    let view = ProbeView()
+    view.isUserInteractionEnabled = false
+    return view
+  }
+
+  func updateUIView(_ view: ProbeView, context: Context) {
+    view.disableBounce()
+  }
+
+  final class ProbeView: UIView {
+    override func didMoveToWindow() {
+      super.didMoveToWindow()
+      disableBounce()
+    }
+
+    func disableBounce() {
+      var ancestor = superview
+      while let view = ancestor {
+        if let scrollView = view as? UIScrollView {
+          scrollView.bounces = false
+          scrollView.alwaysBounceVertical = false
+          return
+        }
+        ancestor = view.superview
+      }
+    }
+  }
+}
+
+private struct SelectedFileThumbnail: View {
+  let file: SelectedFile
+  @State private var thumbnail: UIImage?
+
+  var body: some View {
+    ZStack {
+      if let thumbnail {
+        Image(uiImage: thumbnail)
+          .resizable()
+          .scaledToFill()
+      } else {
+        Image(systemName: symbol)
+          .font(.system(size: 22))
+          .foregroundStyle(.tint)
+      }
+    }
+    .frame(width: 48, height: 48)
+    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+    .clipShape(RoundedRectangle(cornerRadius: 14))
+    .task(id: file.id) {
+      let scoped = file.url.startAccessingSecurityScopedResource()
+      defer { if scoped { file.url.stopAccessingSecurityScopedResource() } }
+      let request = QLThumbnailGenerator.Request(
+        fileAt: file.url,
+        size: CGSize(width: 48, height: 48),
+        scale: UIScreen.main.scale,
+        representationTypes: .all
+      )
+      thumbnail = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).uiImage
+    }
+  }
+
+  private var symbol: String {
+    if file.fileType.hasPrefix("image/") { return "photo" }
+    if file.fileType.hasPrefix("video/") { return "film" }
+    if file.fileType.hasPrefix("audio/") { return "waveform" }
+    return "doc.fill"
   }
 }

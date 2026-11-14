@@ -18,12 +18,14 @@ final class DiscoveryService {
   private var identity: LocalIdentity = LocalIdentity.load()
   private var ownFingerprint = ""
   private var interval: Double = 12
+  private var timeout: Double = 0.9
   private var known: [String: Device] = [:]
 
-  func start(identity: LocalIdentity, ownFingerprint: String, interval: Double) {
+  func start(identity: LocalIdentity, ownFingerprint: String, interval: Double, timeout: Double) {
     self.identity = identity
     self.ownFingerprint = ownFingerprint
     self.interval = max(4, interval)
+    self.timeout = max(0.2, timeout)
     guard loop == nil else { return }
     loop = Task { [weak self] in
       while !Task.isCancelled {
@@ -39,8 +41,9 @@ final class DiscoveryService {
     loop = nil
   }
 
-  func restart(interval: Double) {
+  func restart(interval: Double, timeout: Double) {
     self.interval = max(4, interval)
+    self.timeout = max(0.2, timeout)
   }
 
   /// Records a peer that called our `/register` endpoint, so it shows up without waiting for a scan.
@@ -72,6 +75,7 @@ final class DiscoveryService {
 
     let hosts = NetworkInfo.candidateHosts()
     let identity = self.identity
+    let timeout = self.timeout
     let own = ownFingerprint
     var found: [String: Device] = [:]
 
@@ -80,7 +84,7 @@ final class DiscoveryService {
       let batch = Array(hosts[start..<end])
       await withTaskGroup(of: Device?.self) { group in
         for host in batch {
-          group.addTask { await DeviceProbe.info(host: host, identity: identity) }
+          group.addTask { await DeviceProbe.info(host: host, identity: identity, timeout: timeout) }
         }
         for await device in group {
           guard let device, device.id != own else { continue }
@@ -96,6 +100,21 @@ final class DiscoveryService {
     publish()
   }
 
+  func refresh() async {
+    let began = Date()
+    if isScanning {
+      while isScanning && !Task.isCancelled {
+        try? await Task.sleep(for: .milliseconds(100))
+      }
+    } else {
+      await scan()
+    }
+    let remaining = max(0, 0.6 - Date().timeIntervalSince(began))
+    if remaining > 0, !Task.isCancelled {
+      try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
+    }
+  }
+
   private func publish() {
     devices = known.values.sorted { lhs, rhs in
       lhs.alias.localizedCaseInsensitiveCompare(rhs.alias) == .orderedAscending
@@ -108,21 +127,21 @@ final class DiscoveryService {
 /// TLS peers reject plain HTTP, so every host is tried over https first (trust accepted for the
 /// handshake, the announced fingerprint pins later transfers) and over http as a fallback.
 enum DeviceProbe {
-  static func info(host: String, identity: LocalIdentity) async -> Device? {
+  static func info(host: String, port: Int = 53317, identity: LocalIdentity, timeout: Double) async -> Device? {
     for scheme in ["https", "http"] {
-      if let device = await probe(host: host, scheme: scheme, identity: identity) {
+      if let device = await probe(host: host, port: port, scheme: scheme, identity: identity, timeout: timeout) {
         return device
       }
     }
     return nil
   }
 
-  private static func probe(host: String, scheme: String, identity: LocalIdentity) async -> Device? {
-    guard let url = URL(string: "\(scheme)://\(host):53317/api/localsend/v2/info") else { return nil }
+  private static func probe(host: String, port: Int, scheme: String, identity: LocalIdentity, timeout: Double) async -> Device? {
+    guard let url = URL(string: "\(scheme)://\(host):\(port)/api/localsend/v2/info") else { return nil }
 
     let configuration = URLSessionConfiguration.ephemeral
-    configuration.timeoutIntervalForRequest = 0.9
-    configuration.timeoutIntervalForResource = 1.4
+    configuration.timeoutIntervalForRequest = timeout
+    configuration.timeoutIntervalForResource = timeout + 0.5
     configuration.waitsForConnectivity = false
     configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
     configuration.urlCache = nil
@@ -133,7 +152,7 @@ enum DeviceProbe {
 
     var request = URLRequest(url: url)
     request.httpMethod = "GET"
-    request.timeoutInterval = 0.9
+    request.timeoutInterval = timeout
 
     guard let (data, response) = try? await session.data(for: request),
       let http = response as? HTTPURLResponse,
@@ -149,7 +168,7 @@ enum DeviceProbe {
       alias: dto.alias,
       deviceType: DeviceType(wire: dto.deviceType),
       host: host,
-      port: dto.port ?? 53317,
+      port: dto.port ?? port,
       lastSeen: Date(),
       protocolName: scheme
     )

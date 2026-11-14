@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LocalSend · 接收文件</title>
+  <style>
+    :root { color-scheme: light dark; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    body { max-width: 520px; margin: 0 auto; padding: 48px 20px; background: Canvas; color: CanvasText; }
+    h1 { font-size: 2rem; margin: 0 0 12px; }
+    p { color: GrayText; line-height: 1.5; }
+    label { display: block; margin: 20px 0 8px; }
+    input, button { box-sizing: border-box; width: 100%; padding: 14px; border-radius: 16px; font: inherit; }
+    input { border: 1px solid GrayText; background: Canvas; color: CanvasText; }
+    button { margin-top: 20px; border: 0; background: #008080; color: white; font-weight: 600; }
+    button:disabled { opacity: .5; }
+    #status { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1 id="title">向此设备发送文件</h1>
+  <p id="description">选择文件后，在接收设备上确认传输。</p>
+  <form id="form">
+    <label id="files-label" for="files">文件</label>
+    <input id="files" type="file" multiple required>
+    <label id="pin-label" for="pin">PIN 密码（如有）</label>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="off">
+    <button id="submit">发送</button>
+  </form>
+  <p id="status" role="status" aria-live="polite"></p>
+  <script>
+    const english = !navigator.language.toLowerCase().startsWith('zh');
+    const words = english
+      ? { title: 'Send files to this device', description: 'Select files, then approve the transfer on the receiving device.', files: 'Files', pin: 'PIN (if required)', send: 'Send', waiting: 'Waiting for approval…', complete: 'Transfer complete', failed: 'Transfer failed', uploading: 'Uploading' }
+      : { title: '向此设备发送文件', description: '选择文件后，在接收设备上确认传输。', files: '文件', pin: 'PIN 密码（如有）', send: '发送', waiting: '等待接收设备确认…', complete: '传输完成', failed: '传输失败', uploading: '正在上传' };
+    for (const [id, key] of [['title', 'title'], ['description', 'description'], ['files-label', 'files'], ['pin-label', 'pin'], ['submit', 'send']]) {
+      document.getElementById(id).textContent = words[key];
+    }
+    const form = document.getElementById('form');
+    const status = document.getElementById('status');
+    const submit = document.getElementById('submit');
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const selected = [...document.getElementById('files').files];
+      if (!selected.length) return;
+      submit.disabled = true;
+      status.textContent = words.waiting;
+      try {
+        const ids = selected.map((_, index) => `${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`);
+        const files = {};
+        selected.forEach((file, index) => {
+          files[ids[index]] = { id: ids[index], fileName: file.name, size: file.size, fileType: file.type || 'application/octet-stream' };
+        });
+        const pin = document.getElementById('pin').value;
+        const prepare = await fetch(`/api/localsend/v2/prepare-upload${pin ? '?pin=' + encodeURIComponent(pin) : ''}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ info: { alias: navigator.platform || 'Browser', version: '2.2', deviceType: 'web', fingerprint: ids[0], port: 53317, protocol: 'http', download: false }, files })
+        });
+        if (!prepare.ok) throw new Error(`${prepare.status} ${await prepare.text()}`);
+        const session = await prepare.json();
+        for (let index = 0; index < selected.length; index++) {
+          const token = session.files[ids[index]];
+          if (!token) continue;
+          status.textContent = `${words.uploading} ${index + 1}/${selected.length}: ${selected[index].name}`;
+          const query = new URLSearchParams({ sessionId: session.sessionId, fileId: ids[index], token });
+          const upload = await fetch(`/api/localsend/v2/upload?${query}`, { method: 'POST', body: selected[index] });
+          if (!upload.ok) throw new Error(`${upload.status} ${await upload.text()}`);
+        }
+        status.textContent = words.complete;
+        form.reset();
+      } catch (error) {
+        status.textContent = `${words.failed}: ${error.message}`;
+      } finally { submit.disabled = false; }
+    });
+  </script>
+</body>
+</html>

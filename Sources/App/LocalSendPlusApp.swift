@@ -28,7 +28,9 @@ struct RootView: View {
       SettingsView(settings: model.settings)
         .tabItem { Label("Settings", systemImage: "gearshape.fill") }
     }
-    .tint(.accentColor)
+    .tint(model.settings.accentColor)
+    .preferredColorScheme(model.settings.preferredColorScheme)
+    .environment(\.locale, model.settings.selectedLocale)
     .background(AmbientBackground())
     .task {
       model.start()
@@ -37,10 +39,13 @@ struct RootView: View {
     .onOpenURL { _ in
       model.consumeShareInbox()
     }
-    .sheet(item: $model.incoming) { request in
+    .sheet(item: Binding(
+      get: { model.isWebReceiving ? nil : model.incoming },
+      set: { model.incoming = $0 }
+    )) { request in
       IncomingApprovalSheet(
         request: request,
-        onAccept: { model.accept(request) },
+        onAccept: { selected in model.accept(request, acceptedIds: selected) },
         onDecline: { model.decline(request) }
       )
     }

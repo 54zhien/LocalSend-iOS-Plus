@@ -2,27 +2,49 @@ import SwiftUI
 
 struct ReceiveView: View {
   @Environment(AppModel.self) private var model
-  @State private var showQR = false
-
-  private var pairingURL: URL {
-    let scheme = model.settings.encryption ? "https" : "http"
-    return URL(string: "\(scheme)://\(model.primaryAddress):\(model.deviceIdentity.port)")!
-  }
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @State private var showWebReceive = false
+  @State private var showAdvanced = false
+  @State private var markVisible = true
+  @State private var markFadeTask: Task<Void, Never>?
 
   var body: some View {
     NavigationStack {
-      ScrollView {
-        VStack(spacing: 18) {
-          hero
-          serverCard
-          if model.settings.downloadEnabled { downloadCard }
-          receivedCard
+      GeometryReader { geometry in
+        ScrollView {
+          VStack(spacing: 0) {
+            Spacer(minLength: 40)
+            hero
+            Spacer(minLength: 40)
+            if model.settings.downloadEnabled { downloadCard.padding(.bottom, 16) }
+            if !model.receivedFiles.isEmpty { receivedCard }
+          }
+          .frame(maxWidth: 560)
+          .frame(maxWidth: .infinity)
+          .frame(minHeight: geometry.size.height)
+          .padding(.horizontal, 20)
         }
-        .padding(20)
+        .softTopScrollEdge()
       }
       .background(AmbientBackground())
-      .navigationTitle("Receive")
+      .navigationTitle("")
+      .navigationBarTitleDisplayMode(.inline)
       .toolbar {
+        ToolbarItem(placement: .topBarLeading) {
+          Button {
+            showWebReceive = true
+          } label: {
+            Label {
+              Text("Receive via link")
+            } icon: {
+              Image(systemName: "link")
+                .foregroundStyle(model.settings.accentColor)
+            }
+            .font(.subheadline.weight(.medium))
+            .fixedSize()
+          }
+          .buttonStyle(.plain)
+        }
         ToolbarItem(placement: .topBarTrailing) {
           NavigationLink {
             HistoryView()
@@ -30,53 +52,92 @@ struct ReceiveView: View {
             Image(systemName: "clock.arrow.circlepath")
           }
         }
+        ToolbarItem(placement: .topBarTrailing) {
+          Button {
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) { showAdvanced.toggle() }
+          } label: {
+            Image(systemName: "info.circle")
+          }
+        }
+      }
+      .overlay {
+        if showAdvanced {
+          Color.clear
+            .contentShape(Rectangle())
+            .ignoresSafeArea()
+            .onTapGesture {
+              withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
+                showAdvanced = false
+              }
+            }
+        }
+      }
+      .overlay(alignment: .topTrailing) {
+        if showAdvanced {
+          serverCard
+            .frame(maxWidth: 310)
+            .padding(.top, 8)
+            .padding(.trailing, 16)
+            .compositingGroup()
+            .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .topTrailing)))
+            .zIndex(1)
+        }
       }
       .refreshable { model.refreshIdentity() }
-      .sheet(isPresented: $showQR) {
-        qrSheet
-          .presentationDetents([.height(440)])
+      .sheet(isPresented: $showWebReceive) {
+        WebReceiveView()
+          .presentationDetents([.height(510)])
           .presentationDragIndicator(.visible)
+      }
+      .onAppear {
+        guard !markVisible else { return }
+        markFadeTask?.cancel()
+        markFadeTask = Task {
+          try? await Task.sleep(for: .milliseconds(80))
+          guard !Task.isCancelled else { return }
+          markVisible = true
+        }
+      }
+      .onDisappear {
+        markFadeTask?.cancel()
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { markVisible = false }
       }
     }
   }
 
   private var hero: some View {
-    GlassCard {
-      VStack(spacing: 12) {
-        Image(systemName: "wifi")
-          .font(.system(size: 40, weight: .regular))
-          .foregroundStyle(.tint)
-          .frame(width: 104, height: 104)
-          .glassPanel(cornerRadius: 52, interactive: true)
+    VStack(spacing: 12) {
+      LocalSendMarkView(rotates: model.serverRunning && model.settings.animations && !reduceMotion)
+        .opacity(markVisible ? 1 : 0)
+        .animation(.easeIn(duration: 0.28), value: markVisible)
 
-        Text(model.deviceIdentity.alias)
-          .font(.system(size: 30, weight: .semibold, design: .rounded))
-          .multilineTextAlignment(.center)
+      Text(model.deviceIdentity.alias)
+        .font(.system(size: 48, weight: .regular))
+        .minimumScaleFactor(0.55)
+        .lineLimit(1)
+        .multilineTextAlignment(.center)
 
-        Text("\(model.primaryAddress):\(String(model.deviceIdentity.port))")
-          .font(.system(.subheadline, design: .monospaced))
-          .foregroundStyle(.secondary)
-          .textSelection(.enabled)
-
-        Button {
-          showQR = true
-        } label: {
-          Label("Pairing code", systemImage: "qrcode")
-        }
-        .buttonStyle(.bordered)
-        .font(.footnote.weight(.semibold))
-      }
-      .frame(maxWidth: .infinity)
-      .padding(.vertical, 6)
+      Text(visualIDs)
+        .font(.system(size: 24))
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
     }
+    .frame(maxWidth: .infinity)
+  }
+
+  private var visualIDs: String {
+    guard model.serverRunning else { return String(localized: "Offline") }
+    return model.addresses.map { "#\($0.split(separator: ".").last ?? "")" }.joined(separator: " ")
   }
 
   private var serverCard: some View {
-    GlassCard {
+    GlassCard(cornerRadius: 36) {
       VStack(alignment: .leading, spacing: 14) {
         SectionHeader(title: "Server")
         row("State", model.serverRunning ? "Running" : "Stopped")
-        row("Protocol", model.settings.encryption ? "HTTPS · v2.2" : "HTTP · v2.2")
+        row("Protocol", model.deviceIdentity.protocolName == "https" ? "HTTPS · v2.2" : "HTTP · v2.2")
         row("Port", String(model.deviceIdentity.port))
         row("PIN", model.settings.pin.isEmpty ? "Off" : "On")
         row("Fingerprint", String(model.identity.fingerprint.prefix(16)))
@@ -84,8 +145,11 @@ struct ReceiveView: View {
           model.refreshIdentity()
         } label: {
           Label("Refresh network info", systemImage: "arrow.clockwise")
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(.regularMaterial, in: Capsule())
         }
-        .buttonStyle(GlassProminentButtonStyle())
+        .buttonStyle(.plain)
       }
     }
   }
@@ -106,7 +170,7 @@ struct ReceiveView: View {
   }
 
   private var downloadURL: String {
-    let scheme = model.settings.encryption ? "https" : "http"
+    let scheme = model.deviceIdentity.protocolName
     return "\(scheme)://\(model.primaryAddress):\(model.deviceIdentity.port)/"
   }
 
@@ -125,7 +189,7 @@ struct ReceiveView: View {
                 .font(.system(size: 20))
                 .foregroundStyle(.tint)
                 .frame(width: 36, height: 36)
-                .glassPanel(cornerRadius: 10)
+                .glassPanel(cornerRadius: AppRadius.control)
               VStack(alignment: .leading, spacing: 2) {
                 Text(file.name)
                   .font(.subheadline.weight(.medium))
@@ -148,11 +212,11 @@ struct ReceiveView: View {
 
   private func row(_ label: String, _ value: String) -> some View {
     HStack {
-      Text(label)
+      Text(LocalizedStringKey(label))
         .font(.subheadline)
         .foregroundStyle(.secondary)
       Spacer(minLength: 8)
-      Text(value)
+      Text(LocalizedStringKey(value))
         .font(.subheadline.weight(.medium))
         .lineLimit(1)
         .truncationMode(.middle)
@@ -160,21 +224,4 @@ struct ReceiveView: View {
   }
 
 
-  private var qrSheet: some View {
-    VStack(spacing: 18) {
-      Text("Scan with LocalSend to send files to (model.deviceIdentity.alias)")
-        .font(.subheadline.weight(.semibold))
-        .multilineTextAlignment(.center)
-      QRCodeView(url: pairingURL)
-      Text(pairingURL.absoluteString)
-        .font(.system(.footnote, design: .monospaced))
-        .foregroundStyle(.secondary)
-        .textSelection(.enabled)
-      Button("Done") {
-        showQR = false
-      }
-      .buttonStyle(GlassProminentButtonStyle())
-    }
-    .padding(24)
-  }
 }

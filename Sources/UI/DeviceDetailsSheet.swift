@@ -30,7 +30,7 @@ struct DeviceDetailsSheet: View {
             .font(.system(size: 34))
             .foregroundStyle(.tint)
             .frame(width: 88, height: 88)
-            .glassPanel(cornerRadius: 28)
+            .glassPanel(cornerRadius: AppRadius.control)
 
           Text(device.alias)
             .font(.title3.weight(.semibold))
@@ -78,7 +78,7 @@ struct DeviceDetailsSheet: View {
 
   private func row(_ title: String, _ value: String, monospaced: Bool = false) -> some View {
     HStack(alignment: .firstTextBaseline) {
-      Text(title)
+      Text(LocalizedStringKey(title))
         .font(.caption)
         .foregroundStyle(.secondary)
       Spacer(minLength: 12)

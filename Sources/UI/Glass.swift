@@ -1,38 +1,51 @@
 import SwiftUI
+import UIKit
 
-/// Ambient light behind everything: the glass panels need something to refract.
 struct AmbientBackground: View {
+  @Environment(AppModel.self) private var model
   @Environment(\.colorScheme) private var colorScheme
 
   var body: some View {
-    ZStack {
-      Color(colorScheme == .dark ? .black : .systemBackground)
-      GeometryReader { proxy in
-        ZStack {
-          blob(.blue, size: proxy.size.width * 1.1)
-            .offset(x: -proxy.size.width * 0.35, y: -proxy.size.height * 0.30)
-          blob(.teal, size: proxy.size.width * 0.9)
-            .offset(x: proxy.size.width * 0.45, y: -proxy.size.height * 0.05)
-          blob(.indigo, size: proxy.size.width * 1.2)
-            .offset(x: -proxy.size.width * 0.15, y: proxy.size.height * 0.45)
-        }
-        .blur(radius: 80)
+    Group {
+      if model.settings.colorMode == .oled && colorScheme == .dark {
+        Color.black
+      } else {
+        Color(uiColor: .systemBackground)
       }
     }
     .ignoresSafeArea()
   }
+}
 
-  private func blob(_ color: Color, size: CGFloat) -> some View {
-    Circle()
-      .fill(color.opacity(colorScheme == .dark ? 0.35 : 0.22))
-      .frame(width: size, height: size)
-  }
+enum AppRadius {
+  static let control: CGFloat = 22
+}
+
+extension Color {
+  static let localSendAccent = Color(uiColor: UIColor { traits in
+    traits.userInterfaceStyle == .dark
+      ? UIColor(red: 0, green: 0.561, blue: 0.537, alpha: 1)
+      : UIColor(red: 0, green: 0.502, blue: 0.502, alpha: 1)
+  })
 }
 
 extension View {
+  func materialControl(cornerRadius: CGFloat = AppRadius.control) -> some View {
+    self.background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+  }
+
+  @ViewBuilder
+  func softTopScrollEdge() -> some View {
+    if #available(iOS 26.0, *) {
+      self.scrollEdgeEffectStyle(.soft, for: .top)
+    } else {
+      self
+    }
+  }
+
   /// Liquid Glass on iOS 26+, thin material before that.
   @ViewBuilder
-  func glassPanel(cornerRadius: CGFloat = 26, interactive: Bool = false) -> some View {
+  func glassPanel(cornerRadius: CGFloat = AppRadius.control, interactive: Bool = false) -> some View {
     if #available(iOS 26.0, *) {
       self.glassEffect(
         interactive ? .regular.interactive() : .regular,
@@ -51,7 +64,7 @@ extension View {
 
 /// Card used for every grouped block of content.
 struct GlassCard<Content: View>: View {
-  var cornerRadius: CGFloat = 26
+  var cornerRadius: CGFloat = AppRadius.control
   @ViewBuilder var content: Content
 
   var body: some View {
@@ -69,7 +82,7 @@ struct GlassProminentButtonStyle: ButtonStyle {
       .font(.headline)
       .padding(.horizontal, 22)
       .padding(.vertical, 14)
-      .glassPanel(cornerRadius: 22, interactive: true)
+      .glassPanel(interactive: true)
       .saturation(configuration.isPressed ? 1.25 : 1)
       .scaleEffect(configuration.isPressed ? 0.97 : 1)
       .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
@@ -80,10 +93,8 @@ struct SectionHeader: View {
   let title: String
 
   var body: some View {
-    Text(title.uppercased())
-      .font(.footnote.weight(.semibold))
-      .foregroundStyle(.secondary)
-      .padding(.horizontal, 8)
+    Text(LocalizedStringKey(title))
+      .font(.headline)
       .frame(maxWidth: .infinity, alignment: .leading)
   }
 }

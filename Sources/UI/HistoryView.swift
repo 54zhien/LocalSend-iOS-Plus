@@ -44,6 +44,7 @@ struct HistoryView: View {
       }
       .padding(20)
     }
+    .softTopScrollEdge()
     .background(AmbientBackground())
     .navigationTitle("History")
     .navigationBarTitleDisplayMode(.inline)
@@ -57,12 +58,12 @@ struct HistoryView: View {
   }
 
   private func entryRow(_ entry: HistoryEntry) -> some View {
-    GlassCard(cornerRadius: 22) {
+    GlassCard(cornerRadius: AppRadius.control) {
       VStack(alignment: .leading, spacing: 10) {
         HStack(spacing: 10) {
           Image(systemName: entry.direction == .received ? "arrow.down.circle" : "arrow.up.circle")
             .font(.system(size: 20))
-            .foregroundStyle(entry.direction == .received ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+            .foregroundStyle(entry.direction == .received ? AnyShapeStyle(model.settings.accentColor) : AnyShapeStyle(.secondary))
           Text(entry.alias)
             .font(.subheadline.weight(.semibold))
           Spacer(minLength: 0)
@@ -86,7 +87,7 @@ struct HistoryView: View {
             }
           }
         }
-        Text("\(entry.files.count) file\(entry.files.count == 1 ? "" : "s") · \(entry.totalBytes.formattedSize)")
+        Text("\(entry.files.count) · \(entry.totalBytes.formattedSize)")
           .font(.caption2)
           .foregroundStyle(.tertiary)
       }
