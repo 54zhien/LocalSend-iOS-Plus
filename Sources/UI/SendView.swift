@@ -442,11 +442,11 @@ struct AddFavoriteSheet: View {
             TextField("Name", text: $alias)
               .textFieldStyle(.plain)
               .padding(12)
-              .glassPanel()
+              .materialControl()
             TextField("192.168.178.20", text: $host)
               .textFieldStyle(.plain)
               .padding(12)
-              .glassPanel()
+              .materialControl()
               .keyboardType(.decimalPad)
               .autocorrectionDisabled()
           }
