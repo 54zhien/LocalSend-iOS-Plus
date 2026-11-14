@@ -5,7 +5,6 @@ struct ReceiveView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var showWebReceive = false
   @State private var showAdvanced = false
-  @State private var appeared = false
 
   var body: some View {
     NavigationStack {
@@ -33,11 +32,9 @@ struct ReceiveView: View {
           Button {
             showWebReceive = true
           } label: {
-            Label("Receive via link", systemImage: "globe")
+            Label("Receive via link", systemImage: "link")
               .font(.subheadline.weight(.medium))
-              .padding(.horizontal, 12)
-              .padding(.vertical, 9)
-              .background(.regularMaterial, in: Capsule())
+              .fixedSize()
           }
           .buttonStyle(.plain)
         }
@@ -82,11 +79,8 @@ struct ReceiveView: View {
       .refreshable { model.refreshIdentity() }
       .sheet(isPresented: $showWebReceive) {
         WebReceiveView()
-          .presentationDetents([.large])
+          .presentationDetents([.height(510)])
           .presentationDragIndicator(.visible)
-      }
-      .onAppear {
-        appeared = true
       }
     }
   }
@@ -94,8 +88,6 @@ struct ReceiveView: View {
   private var hero: some View {
     VStack(spacing: 12) {
       LocalSendMarkView(rotates: model.serverRunning && model.settings.animations && !reduceMotion)
-      .opacity(appeared ? 1 : 0)
-      .animation(.easeOut(duration: 0.3).delay(0.2), value: appeared)
 
       Text(model.deviceIdentity.alias)
         .font(.system(size: 48, weight: .regular))
@@ -107,8 +99,6 @@ struct ReceiveView: View {
         .font(.system(size: 24))
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)
-        .opacity(appeared ? 1 : 0)
-        .animation(.easeOut(duration: 0.3).delay(0.5), value: appeared)
     }
     .frame(maxWidth: .infinity)
   }

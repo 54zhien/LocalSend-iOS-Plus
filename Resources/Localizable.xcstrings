@@ -11521,6 +11521,16 @@
         }
       }
     },
+    "Connecting and preparing…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在连接并准备文件…"
+          }
+        }
+      }
+    },
     "Point the camera at the other device's pairing code": {
       "localizations": {
         "zh-Hans": {

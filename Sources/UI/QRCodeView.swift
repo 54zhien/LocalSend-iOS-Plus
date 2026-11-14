@@ -133,13 +133,6 @@ final class ScannerViewController: UIViewController, AVCaptureMetadataOutputObje
     hint.textAlignment = .center
     view.addSubview(hint)
 
-    let close = UIButton(type: .system)
-    close.translatesAutoresizingMaskIntoConstraints = false
-    close.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
-    close.tintColor = .white
-    close.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
-    view.addSubview(close)
-
     NSLayoutConstraint.activate([
       frame.centerXAnchor.constraint(equalTo: view.centerXAnchor),
       frame.centerYAnchor.constraint(equalTo: view.centerYAnchor),
@@ -150,15 +143,7 @@ final class ScannerViewController: UIViewController, AVCaptureMetadataOutputObje
       hint.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
       hint.topAnchor.constraint(equalTo: frame.bottomAnchor, constant: 24),
 
-      close.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-      close.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
-      close.widthAnchor.constraint(equalToConstant: 32),
-      close.heightAnchor.constraint(equalToConstant: 32),
     ])
-  }
-
-  @objc private func cancelTapped() {
-    onCancel?()
   }
 
   func metadataOutput(

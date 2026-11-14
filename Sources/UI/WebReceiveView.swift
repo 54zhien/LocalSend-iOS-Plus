@@ -12,26 +12,35 @@ struct WebReceiveView: View {
   var body: some View {
     @Bindable var model = model
     NavigationStack {
-      ScrollView {
-        VStack(spacing: 20) {
-          QRCodeView(url: url)
+      VStack(spacing: 18) {
+          QRCodeView(url: url, size: 170)
           Text(url.absoluteString)
-            .font(.system(.body, design: .monospaced))
+            .font(.system(.subheadline, design: .monospaced))
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
             .textSelection(.enabled)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(.regularMaterial, in: Capsule())
           Text("Open this link in a browser on the same Wi-Fi network, choose files, then approve the request here.")
             .font(.subheadline)
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
+          Spacer(minLength: 0)
           Button {
             UIPasteboard.general.url = url
           } label: {
             Label("Copy link", systemImage: "doc.on.doc")
+              .font(.headline)
+              .frame(maxWidth: .infinity)
+              .padding(.vertical, 14)
+              .background(.regularMaterial, in: Capsule())
           }
-          .buttonStyle(GlassProminentButtonStyle())
-        }
-        .frame(maxWidth: .infinity)
-        .padding(24)
+          .buttonStyle(.plain)
       }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .padding(24)
       .background(AmbientBackground())
       .navigationTitle("Receive via link")
       .navigationBarTitleDisplayMode(.inline)

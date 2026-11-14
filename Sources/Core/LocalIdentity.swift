@@ -152,7 +152,9 @@ final class LocalIdentity {
 
   private static func generate() -> LocalIdentity? {
     guard let key = loadOrCreateKey() else { return nil }
-    guard let publicData = SecKeyCopyExternalRepresentation(key, nil) else { return nil }
+    guard let publicKey = SecKeyCopyPublicKey(key),
+      let publicData = SecKeyCopyExternalRepresentation(publicKey, nil)
+    else { return nil }
     let publicDER = publicData as Data
 
     let name = DER.sequence([

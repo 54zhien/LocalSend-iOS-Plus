@@ -356,22 +356,44 @@ final class AppModel {
 
   func send(files: [SelectedFile], to device: Device, pin: String? = nil) {
     guard !files.isEmpty else { return }
+    beginOutgoing(files: files, alias: device.alias)
 
-    let transfer = OutgoingTransfer(
+    Task { [weak self] in
+      guard let self else { return }
+      await self.performSend(files: files, to: device, pin: pin)
+    }
+  }
+
+  func send(files: [SelectedFile], to favorite: FavoriteDevice) {
+    guard !files.isEmpty else { return }
+    beginOutgoing(files: files, alias: favorite.alias)
+    Task { [weak self] in
+      guard let self else { return }
+      guard let resolved = await DeviceProbe.info(
+        host: favorite.host,
+        port: favorite.port,
+        identity: identity,
+        timeout: max(2, settings.discoveryTimeout)
+      ) else {
+        outgoing?.isFinished = true
+        outgoing?.error = String(localized: "Cannot connect to the favourite device.")
+        return
+      }
+      favorites.update(favorite, from: resolved)
+      await performSend(files: files, to: resolved)
+    }
+  }
+
+  private func beginOutgoing(files: [SelectedFile], alias: String) {
+    outgoing = OutgoingTransfer(
       id: UUID().uuidString,
-      deviceAlias: device.alias,
+      deviceAlias: alias,
       fileNames: files.map(\.name),
       completed: 0,
       total: files.count,
       isFinished: false,
       error: nil
     )
-    outgoing = transfer
-
-    Task { [weak self] in
-      guard let self else { return }
-      await self.performSend(files: files, to: device, pin: pin)
-    }
   }
 
   private func performSend(files: [SelectedFile], to device: Device, pin: String? = nil) async {
@@ -404,7 +426,6 @@ final class AppModel {
     } catch {
       outgoing?.isFinished = true
       outgoing?.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-      errorMessage = outgoing?.error
     }
   }
 

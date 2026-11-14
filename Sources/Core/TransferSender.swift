@@ -138,6 +138,18 @@ struct TransferSender {
     }
     let info = own.infoDTO(downloadEnabled: settings.downloadEnabled)
 
+    let shouldHash = settings.createChecksums
+    let hashTargets = files.map { (id: $0.id, url: $0.url) }
+    let hashes = try await Task.detached(priority: .userInitiated) {
+      var results: [String: String] = [:]
+      if shouldHash {
+        for target in hashTargets {
+          results[target.id] = try FileHash.sha256(of: target.url)
+        }
+      }
+      return results
+    }.value
+
     var fileMap: [String: FileDTO] = [:]
     for file in files {
       fileMap[file.id] = FileDTO(
@@ -145,7 +157,7 @@ struct TransferSender {
         fileName: file.name,
         size: file.size,
         fileType: file.fileType,
-        sha256: settings.createChecksums ? try FileHash.sha256(of: file.url) : nil
+        sha256: hashes[file.id]
       )
     }
 

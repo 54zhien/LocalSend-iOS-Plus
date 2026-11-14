@@ -109,13 +109,26 @@ struct SendView: View {
         DeviceDetailsSheet(device: device)
       }
       .sheet(isPresented: $scannerPresented) {
-        QRScannerView(
-          onCode: { code in
-            handleScanned(code: code, model: model)
-          },
-          onCancel: { scannerPresented = false }
-        )
-        .ignoresSafeArea()
+        ZStack(alignment: .topTrailing) {
+          QRScannerView(
+            onCode: { code in
+              handleScanned(code: code, model: model)
+            },
+            onCancel: { scannerPresented = false }
+          )
+          .ignoresSafeArea()
+          Button { scannerPresented = false } label: {
+            Image(systemName: "xmark")
+              .font(.system(size: 18, weight: .semibold))
+              .foregroundStyle(.white)
+              .frame(width: 48, height: 48)
+              .glassPanel(cornerRadius: 24, interactive: true)
+          }
+          .buttonStyle(.plain)
+          .padding(.top, 12)
+          .padding(.trailing, 20)
+        }
+        .preferredColorScheme(.dark)
       }
     }
   }
@@ -229,19 +242,7 @@ struct SendView: View {
             Spacer(minLength: 0)
 
             Button {
-              Task {
-                guard let resolved = await DeviceProbe.info(
-                  host: favorite.host,
-                  port: favorite.port,
-                  identity: model.identity,
-                  timeout: max(2, model.settings.discoveryTimeout)
-                ) else {
-                  model.errorMessage = String(localized: "Cannot connect to the favourite device.")
-                  return
-                }
-                model.favorites.update(favorite, from: resolved)
-                send(to: resolved)
-              }
+              send(to: favorite)
             } label: {
               Image(systemName: "paperplane.fill")
                 .foregroundStyle(model.selection.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
@@ -399,6 +400,17 @@ struct SendView: View {
     }
     if model.settings.sendMode == .single { model.selection = [] }
     model.send(files: files, to: device)
+  }
+
+  private func send(to favorite: FavoriteDevice) {
+    let files = model.selection
+    guard !files.isEmpty else { return }
+    if model.outgoing != nil {
+      model.errorMessage = String(localized: "Finish the current transfer first.")
+      return
+    }
+    if model.settings.sendMode == .single { model.selection = [] }
+    model.send(files: files, to: favorite)
   }
 
   /// A scanned LocalSend code is either a pairing URL or a bare host.

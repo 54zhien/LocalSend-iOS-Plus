@@ -18,19 +18,22 @@ struct TransferProgressView: View {
   }
 
   var body: some View {
-    VStack(spacing: 18) {
-      Capsule()
-        .fill(.secondary.opacity(0.4))
-        .frame(width: 36, height: 5)
-        .padding(.top, 8)
-
+    VStack(spacing: 12) {
       Image(systemName: transfer.error == nil ? "paperplane.fill" : "exclamationmark.triangle.fill")
-        .font(.system(size: 34, weight: .light))
-        .frame(width: 78, height: 78)
-        .glassPanel(cornerRadius: AppRadius.control)
+        .font(.system(size: 28, weight: .medium))
+        .foregroundStyle(.tint)
+        .frame(width: 64, height: 64)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppRadius.control))
 
       Text(transfer.deviceAlias)
         .font(.title3.weight(.semibold))
+        .lineLimit(1)
+      if let first = transfer.fileNames.first {
+        Text(transfer.fileNames.count == 1 ? first : "\(first) +\(transfer.fileNames.count - 1)")
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+      }
 
       if let error = transfer.error {
         Text(error)
@@ -40,26 +43,33 @@ struct TransferProgressView: View {
       } else {
         ProgressView(value: Double(transfer.completed), total: Double(max(transfer.total, 1)))
           .tint(model.settings.accentColor)
-        Text(transfer.isFinished ? String(localized: "Sent files") : String(localized: "Sending files"))
+        HStack {
+          Text(transfer.isFinished ? String(localized: "Sent files") : transfer.sessionId == nil ? String(localized: "Connecting and preparing…") : String(localized: "Sending files"))
           .font(.footnote)
           .foregroundStyle(.secondary)
-        Text("\(transfer.completed) / \(transfer.total)")
-          .font(.footnote)
-          .foregroundStyle(.secondary)
+          Spacer()
+          Text("\(transfer.completed) / \(transfer.total)")
+            .font(.footnote.monospacedDigit())
+            .foregroundStyle(.secondary)
+        }
       }
 
       if transfer.isFinished || transfer.error != nil {
         Button("Done") { model.dismissOutgoing() }
-          .buttonStyle(GlassProminentButtonStyle())
+          .font(.headline)
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 13)
+          .background(.regularMaterial, in: Capsule())
+          .buttonStyle(.plain)
       }
-
-      Spacer(minLength: 0)
     }
-    .padding(24)
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .padding(.horizontal, 24)
+    .padding(.top, 28)
+    .padding(.bottom, 20)
+    .frame(maxWidth: .infinity)
     .background(AmbientBackground())
-    .presentationDetents([.height(400)])
-    .presentationDragIndicator(.hidden)
+    .presentationDetents([.height(315)])
+    .presentationDragIndicator(.visible)
     .interactiveDismissDisabled(!transfer.isFinished && transfer.error == nil)
   }
 }
