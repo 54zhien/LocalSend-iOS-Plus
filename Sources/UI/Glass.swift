@@ -30,8 +30,8 @@ extension Color {
 }
 
 extension View {
-  func materialControl() -> some View {
-    self.background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+  func materialControl(cornerRadius: CGFloat = AppRadius.control) -> some View {
+    self.background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
   }
 
   @ViewBuilder

@@ -437,16 +437,16 @@ struct AddFavoriteSheet: View {
   var body: some View {
     NavigationStack {
       VStack(spacing: 16) {
-        GlassCard {
+        GlassCard(cornerRadius: 36) {
           VStack(alignment: .leading, spacing: 12) {
             TextField("Name", text: $alias)
               .textFieldStyle(.plain)
               .padding(12)
-              .materialControl()
+              .materialControl(cornerRadius: 36)
             TextField("192.168.178.20", text: $host)
               .textFieldStyle(.plain)
               .padding(12)
-              .materialControl()
+              .materialControl(cornerRadius: 36)
               .keyboardType(.decimalPad)
               .autocorrectionDisabled()
           }
@@ -471,6 +471,7 @@ struct AddFavoriteSheet: View {
       }
     }
     .presentationDetents([.height(300)])
+    .presentationCornerRadius(36)
   }
 }
 
