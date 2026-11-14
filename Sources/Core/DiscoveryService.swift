@@ -101,12 +101,17 @@ final class DiscoveryService {
   }
 
   func refresh() async {
+    let began = Date()
     if isScanning {
       while isScanning && !Task.isCancelled {
         try? await Task.sleep(for: .milliseconds(100))
       }
     } else {
       await scan()
+    }
+    let remaining = max(0, 0.6 - Date().timeIntervalSince(began))
+    if remaining > 0, !Task.isCancelled {
+      try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
     }
   }
 
