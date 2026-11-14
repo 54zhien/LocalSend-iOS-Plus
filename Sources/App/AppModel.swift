@@ -164,7 +164,13 @@ final class AppModel {
     // Never drop a live session: a suspended app cannot have one, so this only guards
     // against a foreground return that races a running transfer.
     guard incoming == nil, outgoing == nil, pinRequest == nil else { return }
-    applyNetworkSettings()
+    if server.isRunning {
+      // The listener survived; only the interface list and the announce loop need refreshing.
+      refreshAddresses()
+      publishInfo()
+    } else {
+      applyNetworkSettings()
+    }
     // The multicast socket is suspended along with the process, so peers stop seeing us
     // until both the discovery listener and the announce loop are created again.
     discovery.stop()
@@ -231,16 +237,11 @@ final class AppModel {
       port: settings.port,
       protocolName: usesTLS ? "https" : "http"
     )
-    server.stop()
-    configureServer()
     if started {
-      do {
-        try server.start()
-      } catch {
-        serverRunning = false
-        errorMessage = error.localizedDescription
-      }
+      rebindServer()
     } else {
+      server.stop()
+      configureServer()
       serverRunning = false
     }
     publishInfo()
@@ -268,11 +269,17 @@ final class AppModel {
     bindRetries = 0
     server.stop()
     configureServer()
-    do {
-      try server.start()
-    } catch {
-      errorMessage = error.localizedDescription
-      scheduleBindRetry()
+    Task { @MainActor [weak self] in
+      // NWListener releases the socket asynchronously; rebinding immediately fails with
+      // EADDRINUSE even though the predecessor is already cancelled.
+      try? await Task.sleep(for: .milliseconds(350))
+      guard let self, self.started else { return }
+      do {
+        try self.server.start()
+      } catch {
+        self.errorMessage = error.localizedDescription
+        self.scheduleBindRetry()
+      }
     }
   }
 
@@ -348,6 +355,7 @@ final class AppModel {
       guard let self, self.started, !self.server.isRunning else { return }
       self.server.stop()
       self.configureServer()
+      try? await Task.sleep(for: .milliseconds(350))
       do {
         try self.server.start()
       } catch {
