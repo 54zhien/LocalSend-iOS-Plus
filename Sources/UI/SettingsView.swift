@@ -164,6 +164,11 @@ struct SettingsView: View {
   private var deviceCard: some View {
     GlassCard {
       VStack(alignment: .leading, spacing: 16) {
+        if settings.encryption && model.identity.identity == nil {
+          Text("TLS identity unavailable. The server is using HTTP.")
+            .font(.footnote)
+            .foregroundStyle(.orange)
+        }
         HStack(spacing: 12) {
           Text(LocalizedStringKey(model.serverRunning ? "Server" : "Server (offline)"))
             .font(.subheadline)
@@ -420,7 +425,7 @@ struct SettingsView: View {
         HStack {
           Text("Protocol")
           Spacer()
-          Text("v2.2 · \(settings.encryption ? "HTTPS" : "HTTP")").foregroundStyle(.secondary)
+          Text("v2.2 · \(model.deviceIdentity.protocolName.uppercased())").foregroundStyle(.secondary)
         }
         .font(.subheadline)
         HStack {

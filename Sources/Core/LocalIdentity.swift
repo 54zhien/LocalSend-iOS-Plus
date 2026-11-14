@@ -104,7 +104,7 @@ final class LocalIdentity {
   }
 
   private static let keyTag = Data("com.imzhien.localsendplus.identity.key".utf8)
-  private static let certTag = Data("com.imzhien.localsendplus.identity.cert".utf8)
+  private static let certificateDefaultsKey = "localSendTLSCertificateDER"
 
   let certificate: SecCertificate?
   let identity: SecIdentity?
@@ -138,25 +138,14 @@ final class LocalIdentity {
   // MARK: Keychain
 
   private static func loadFromKeychain() -> LocalIdentity? {
-    let query: [String: Any] = [
-      kSecClass as String: kSecClassCertificate,
-      kSecAttrApplicationTag as String: certTag,
-      kSecReturnRef as String: true,
-      kSecMatchLimit as String: kSecMatchLimitOne,
-    ]
-    var item: CFTypeRef?
-    guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-      let value = item,
-      CFGetTypeID(value) == SecCertificateGetTypeID()
-    else {
-      return nil
-    }
-    let certificate = value as! SecCertificate
-    let der = SecCertificateCopyData(certificate) as Data
+    guard let der = UserDefaults.standard.data(forKey: certificateDefaultsKey),
+      let certificate = SecCertificateCreateWithData(nil, der as CFData),
+      let identity = keychainIdentity(matching: certificate)
+    else { return nil }
 
     return LocalIdentity(
       certificate: certificate,
-      identity: LocalIdentity.keychainIdentity(for: keyTag),
+      identity: identity,
       fingerprint: Hex.sha256(der)
     )
   }
@@ -169,8 +158,9 @@ final class LocalIdentity {
     let name = DER.sequence([
       DER.set([DER.sequence([DER.oid(OID.commonName), DER.utf8("LocalSend User")])])
     ])
-    let algorithm = DER.sequence([DER.oid(OID.sha256WithRSA), DER.null()])
-    let spki = DER.sequence([algorithm, DER.bitString(publicDER)])
+    let signatureAlgorithm = DER.sequence([DER.oid(OID.sha256WithRSA), DER.null()])
+    let publicKeyAlgorithm = DER.sequence([DER.oid(OID.rsaEncryption), DER.null()])
+    let spki = DER.sequence([publicKeyAlgorithm, DER.bitString(publicDER)])
 
     let now = Date()
     let notBefore = now.addingTimeInterval(-60 * 60 * 24)
@@ -184,7 +174,7 @@ final class LocalIdentity {
     let tbs = DER.sequence([
       DER.explicit(0, DER.integer(2)),
       DER.integer(Data(serialBytes)),
-      algorithm,
+      signatureAlgorithm,
       name,
       validity,
       name,
@@ -203,20 +193,21 @@ final class LocalIdentity {
     }
     let signature = signatureData as Data
 
-    let certificateDER = DER.sequence([tbs, algorithm, DER.bitString(signature)])
+    let certificateDER = DER.sequence([tbs, signatureAlgorithm, DER.bitString(signature)])
     guard let certificate = SecCertificateCreateWithData(nil, certificateDER as CFData) else {
       return nil
     }
 
     let certQuery: [String: Any] = [
       kSecClass as String: kSecClassCertificate,
-      kSecAttrApplicationTag as String: keyTag,
       kSecValueRef as String: certificate,
+      kSecAttrLabel as String: "LocalSend Plus TLS",
     ]
-    SecItemDelete(certQuery as CFDictionary)
-    SecItemAdd(certQuery as CFDictionary, nil)
-
-    let identity = LocalIdentity.keychainIdentity(for: keyTag)
+    let addStatus = SecItemAdd(certQuery as CFDictionary, nil)
+    guard addStatus == errSecSuccess || addStatus == errSecDuplicateItem,
+      let identity = keychainIdentity(matching: certificate)
+    else { return nil }
+    UserDefaults.standard.set(certificateDER, forKey: certificateDefaultsKey)
 
     return LocalIdentity(
       certificate: certificate,
@@ -256,21 +247,28 @@ final class LocalIdentity {
     return key
   }
 
-  /// iOS has no SecIdentityCreateWithCertificate; a keychain query pairs the certificate
-  /// and its private key when both were stored under the same application tag.
-  static func keychainIdentity(for tag: Data) -> SecIdentity? {
+  /// iOS pairs a certificate and a private key by their public-key hash.
+  static func keychainIdentity(matching certificate: SecCertificate) -> SecIdentity? {
     let query: [String: Any] = [
       kSecClass as String: kSecClassIdentity,
-      kSecAttrApplicationTag as String: tag,
       kSecReturnRef as String: true,
-      kSecMatchLimit as String: kSecMatchLimitOne,
+      kSecMatchLimit as String: kSecMatchLimitAll,
     ]
     var item: CFTypeRef?
-    guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess, let item else {
-      return nil
+    guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+      let identities = item as? [SecIdentity]
+    else { return nil }
+    let expected = SecCertificateCopyData(certificate) as Data
+    for identity in identities {
+      var storedCertificate: SecCertificate?
+      guard SecIdentityCopyCertificate(identity, &storedCertificate) == errSecSuccess,
+        let storedCertificate
+      else { continue }
+      if (SecCertificateCopyData(storedCertificate) as Data) == expected {
+        return identity
+      }
     }
-    guard CFGetTypeID(item) == SecIdentityGetTypeID() else { return nil }
-    return (item as! SecIdentity)
+    return nil
   }
 }
 

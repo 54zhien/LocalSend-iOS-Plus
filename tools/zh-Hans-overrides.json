@@ -80,6 +80,7 @@
   "Server": "服务器",
   "Device model": "设备型号",
   "Server (offline)": "服务器（离线）",
+  "TLS identity unavailable. The server is using HTTP.": "TLS 身份不可用，服务器正使用 HTTP。",
   "Start": "启动",
   "Restart": "重启",
   "Stop": "停止",

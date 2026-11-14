@@ -123,7 +123,7 @@ struct ReceiveView: View {
       VStack(alignment: .leading, spacing: 14) {
         SectionHeader(title: "Server")
         row("State", model.serverRunning ? "Running" : "Stopped")
-        row("Protocol", model.settings.encryption ? "HTTPS · v2.2" : "HTTP · v2.2")
+        row("Protocol", model.deviceIdentity.protocolName == "https" ? "HTTPS · v2.2" : "HTTP · v2.2")
         row("Port", String(model.deviceIdentity.port))
         row("PIN", model.settings.pin.isEmpty ? "Off" : "On")
         row("Fingerprint", String(model.identity.fingerprint.prefix(16)))
@@ -156,7 +156,7 @@ struct ReceiveView: View {
   }
 
   private var downloadURL: String {
-    let scheme = model.settings.encryption ? "https" : "http"
+    let scheme = model.deviceIdentity.protocolName
     return "\(scheme)://\(model.primaryAddress):\(model.deviceIdentity.port)/"
   }
 

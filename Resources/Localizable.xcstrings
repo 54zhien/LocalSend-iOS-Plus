@@ -11881,6 +11881,16 @@
         }
       }
     },
+    "TLS identity unavailable. The server is using HTTP.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TLS 身份不可用，服务器正使用 HTTP。"
+          }
+        }
+      }
+    },
     "Start": {
       "localizations": {
         "zh-Hans": {

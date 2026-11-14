@@ -108,6 +108,9 @@ final class AppModel {
   private var webReceiveMode = false
   private var webSendFiles: [SelectedFile]?
   var isWebReceiving: Bool { webReceiveMode }
+  private var usesTLS: Bool {
+    settings.encryption && identity.identity != nil && !webReceiveMode && webSendFiles == nil
+  }
 
   init() {
     deviceIdentity = DeviceIdentity(
@@ -116,7 +119,7 @@ final class AppModel {
       deviceModel: settings.deviceModel,
       deviceType: settings.deviceType,
       port: settings.port,
-      protocolName: settings.encryption ? "https" : "http"
+      protocolName: settings.encryption && identity.identity != nil ? "https" : "http"
     )
   }
 
@@ -177,14 +180,13 @@ final class AppModel {
 
   /// Re-applies settings that require restarting the listener.
   func applyNetworkSettings() {
-    let encrypted = settings.encryption && !webReceiveMode && webSendFiles == nil
     deviceIdentity = DeviceIdentity(
       alias: settings.alias,
       fingerprint: identity.fingerprint,
       deviceModel: settings.deviceModel,
       deviceType: settings.deviceType,
       port: settings.port,
-      protocolName: encrypted ? "https" : "http"
+      protocolName: usesTLS ? "https" : "http"
     )
     server.stop()
     configureServer()
@@ -224,7 +226,7 @@ final class AppModel {
       deviceModel: settings.deviceModel,
       deviceType: settings.deviceType,
       port: settings.port,
-      protocolName: settings.encryption && !webReceiveMode && webSendFiles == nil ? "https" : "http"
+      protocolName: usesTLS ? "https" : "http"
     )
     publishInfo()
   }
@@ -235,7 +237,7 @@ final class AppModel {
 
   private func configureServer() {
     server.identity = identity
-    server.encryption = settings.encryption && !webReceiveMode && webSendFiles == nil
+    server.encryption = usesTLS
     server.verifyChecksums = settings.verifyChecksums
     server.webUploadEnabled = webReceiveMode
     server.webSendEnabled = webSendFiles != nil

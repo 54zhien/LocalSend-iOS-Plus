@@ -78,6 +78,15 @@ struct FileDTO: Codable, Equatable, Identifiable {
   var fileType: String
   var sha256: String?
   var preview: String?
+
+  enum CodingKeys: String, CodingKey {
+    case id
+    case fileName
+    case size
+    case fileType
+    case preview
+    case sha256 = "hash"
+  }
 }
 
 struct PrepareUploadRequest: Codable {
