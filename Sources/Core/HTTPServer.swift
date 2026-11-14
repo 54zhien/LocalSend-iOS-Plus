@@ -43,6 +43,8 @@ final class LocalHTTPServer {
 
   private let queue = DispatchQueue(label: "org.localsend.http.server")
   private var listener: NWListener?
+  /// Guards against a cancelled listener reporting a stale state after a restart.
+  private var generation = 0
   private var sessions: [String: Session] = [:]
   private var activeSessionId: String?
   private var pinFailures: [String: Int] = [:]
@@ -65,6 +67,9 @@ final class LocalHTTPServer {
   /// Where received files are written; falls back to `Documents/LocalSend`.
   var destinationProvider: (() -> URL)?
   var onEvent: ((ServerEvent) -> Void)?
+  /// Reports the listener's real state on the server queue. The UI must not assume the
+  /// port was acquired: `NWListener` fails asynchronously, long after `start()` returns.
+  var onStateChange: ((Bool, String?) -> Void)?
 
   var identityProvider: () -> DeviceInfoDTO = {
     DeviceInfoDTO(
@@ -83,6 +88,8 @@ final class LocalHTTPServer {
 
   func start() throws {
     guard !isRunning else { return }
+    generation += 1
+    let currentGeneration = generation
 
     let parameters: NWParameters
     if encryption, identity.identity != nil {
@@ -100,11 +107,19 @@ final class LocalHTTPServer {
       HTTPConnection(connection: connection, server: self, queue: self.queue).start()
     }
     listener.stateUpdateHandler = { [weak self] state in
-      guard let self else { return }
+      guard let self, currentGeneration == self.generation else { return }
       switch state {
-      case .ready: self.isRunning = true
-      case .failed, .cancelled: self.isRunning = false
-      default: break
+      case .ready:
+        self.isRunning = true
+        self.onStateChange?(true, nil)
+      case .failed(let error):
+        self.isRunning = false
+        self.onStateChange?(false, String(describing: error))
+      case .cancelled:
+        self.isRunning = false
+        self.onStateChange?(false, nil)
+      default:
+        break
       }
     }
     listener.start(queue: queue)
@@ -112,6 +127,7 @@ final class LocalHTTPServer {
   }
 
   func stop() {
+    generation += 1
     listener?.cancel()
     listener = nil
     isRunning = false

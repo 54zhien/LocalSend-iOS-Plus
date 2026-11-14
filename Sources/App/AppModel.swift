@@ -139,7 +139,6 @@ final class AppModel {
     configureServer()
     do {
       try server.start()
-      serverRunning = true
     } catch {
       serverRunning = false
       errorMessage = error.localizedDescription
@@ -235,7 +234,6 @@ final class AppModel {
     if started {
       do {
         try server.start()
-        serverRunning = true
       } catch {
         serverRunning = false
         errorMessage = error.localizedDescription
@@ -303,6 +301,19 @@ final class AppModel {
     server.onEvent = { [weak self] event in
       Task { @MainActor [weak self] in
         self?.handle(event)
+      }
+    }
+    // The listener settles asynchronously: only `.ready` means the port is really ours.
+    server.onStateChange = { [weak self] running, failure in
+      Task { @MainActor [weak self] in
+        guard let self else { return }
+        self.serverRunning = running
+        if running {
+          self.publishInfo()
+          self.announcePresence()
+        } else if let failure {
+          self.errorMessage = failure
+        }
       }
     }
   }
