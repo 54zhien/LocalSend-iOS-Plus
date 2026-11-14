@@ -12,8 +12,8 @@ struct WebReceiveView: View {
   var body: some View {
     @Bindable var model = model
     NavigationStack {
-      VStack(spacing: 18) {
-          QRCodeView(url: url, size: 170)
+      VStack(spacing: 14) {
+          QRCodeView(url: url, size: 150)
           Text(url.absoluteString)
             .font(.system(size: 18, weight: .medium, design: .monospaced))
             .lineLimit(1)
@@ -27,14 +27,21 @@ struct WebReceiveView: View {
             .font(.subheadline)
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .layoutPriority(1)
           Spacer(minLength: 0)
           Button {
             UIPasteboard.general.url = url
           } label: {
             HStack {
               Spacer(minLength: 0)
-              Label("Copy link", systemImage: "doc.on.doc")
-                .font(.headline)
+              Label {
+                Text("Copy link")
+              } icon: {
+                Image(systemName: "doc.on.doc")
+                  .foregroundStyle(model.settings.accentColor)
+              }
+              .font(.headline)
               Spacer(minLength: 0)
             }
             .padding(.vertical, 14)
