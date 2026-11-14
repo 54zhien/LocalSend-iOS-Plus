@@ -292,14 +292,6 @@ struct SettingsView: View {
             }
         }
 
-        VStack(alignment: .leading, spacing: 4) {
-          Text("Fingerprint")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-          Text(model.identity.fingerprint)
-            .font(.system(.caption2, design: .monospaced))
-            .textSelection(.enabled)
-        }
         Button {
           Task { await model.discovery.scan() }
         } label: {
