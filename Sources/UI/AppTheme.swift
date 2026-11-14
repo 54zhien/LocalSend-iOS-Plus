@@ -5,9 +5,9 @@ extension AppSettings {
   var preferredColorScheme: ColorScheme? {
     if colorMode == .oled { return .dark }
     switch brightness {
-    case .system: nil
-    case .light: .light
-    case .dark: .dark
+    case .system: return nil
+    case .light: return .light
+    case .dark: return .dark
     }
   }
 
