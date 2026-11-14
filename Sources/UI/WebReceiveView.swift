@@ -50,7 +50,9 @@ struct WebReceiveView: View {
           .buttonStyle(.plain)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .padding(24)
+      .padding(.horizontal, 24)
+      .padding(.top, 16)
+      .padding(.bottom, 4)
       .background(AmbientBackground())
       .navigationTitle("Receive via link")
       .navigationBarTitleDisplayMode(.inline)

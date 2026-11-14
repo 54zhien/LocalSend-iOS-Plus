@@ -34,9 +34,14 @@ struct ReceiveView: View {
           Button {
             showWebReceive = true
           } label: {
-            Label("Receive via link", systemImage: "link")
-              .font(.subheadline.weight(.medium))
-              .fixedSize()
+            Label {
+              Text("Receive via link")
+            } icon: {
+              Image(systemName: "link")
+                .foregroundStyle(model.settings.accentColor)
+            }
+            .font(.subheadline.weight(.medium))
+            .fixedSize()
           }
           .buttonStyle(.plain)
         }

@@ -1,3 +1,5 @@
+import QuickLook
+import QuickLookThumbnailing
 import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
@@ -17,6 +19,8 @@ struct SendView: View {
   @State private var webSendFiles: [SelectedFile] = []
   @State private var pendingWebSend = false
   @State private var sendModeHelpPresented = false
+  @State private var previewURL: URL?
+  @State private var scopedPreviewURLs: [URL] = []
 
   var body: some View {
     @Bindable var model = model
@@ -131,6 +135,10 @@ struct SendView: View {
         }
         .preferredColorScheme(.dark)
       }
+      .quickLookPreview($previewURL, in: model.selection.map(\.url))
+      .onChange(of: previewURL) { _, newValue in
+        if newValue == nil { releasePreviewAccess() }
+      }
     }
   }
 
@@ -165,20 +173,27 @@ struct SendView: View {
 
           ForEach(model.selection) { file in
             HStack(spacing: 12) {
-              Image(systemName: "doc.fill")
-                .font(.system(size: 18))
-                .foregroundStyle(.tint)
-                .frame(width: 34, height: 34)
-                .glassPanel(cornerRadius: AppRadius.control)
-              VStack(alignment: .leading, spacing: 2) {
-                Text(file.name)
-                  .font(.subheadline.weight(.medium))
-                  .lineLimit(1)
-                Text(Int64(file.size).formattedSize)
-                  .font(.caption)
-                  .foregroundStyle(.secondary)
+              Button {
+                openPreview(file)
+              } label: {
+                HStack(spacing: 12) {
+                  SelectedFileThumbnail(file: file)
+                  VStack(alignment: .leading, spacing: 2) {
+                    Text(file.name)
+                      .font(.subheadline.weight(.medium))
+                      .lineLimit(1)
+                    Text(Int64(file.size).formattedSize)
+                      .font(.caption)
+                      .foregroundStyle(.secondary)
+                  }
+                  Spacer(minLength: 0)
+                  Image(systemName: "eye")
+                    .font(.subheadline)
+                    .foregroundStyle(.tint)
+                }
+                .contentShape(Rectangle())
               }
-              Spacer(minLength: 0)
+              .buttonStyle(.plain)
               Button {
                 model.selection.removeAll { $0.id == file.id }
               } label: {
@@ -202,6 +217,19 @@ struct SendView: View {
         }
       }
     }
+  }
+
+  private func openPreview(_ file: SelectedFile) {
+    releasePreviewAccess()
+    scopedPreviewURLs = model.selection.compactMap { selected in
+      selected.url.startAccessingSecurityScopedResource() ? selected.url : nil
+    }
+    previewURL = file.url
+  }
+
+  private func releasePreviewAccess() {
+    scopedPreviewURLs.forEach { $0.stopAccessingSecurityScopedResource() }
+    scopedPreviewURLs = []
   }
 
   private func selectionButton(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
@@ -437,20 +465,20 @@ struct AddFavoriteSheet: View {
   var body: some View {
     NavigationStack {
       VStack(spacing: 16) {
-        GlassCard(cornerRadius: 36) {
-          VStack(alignment: .leading, spacing: 12) {
-            TextField("Name", text: $alias)
-              .textFieldStyle(.plain)
-              .padding(12)
-              .materialControl(cornerRadius: 36)
-            TextField("192.168.178.20", text: $host)
-              .textFieldStyle(.plain)
-              .padding(12)
-              .materialControl(cornerRadius: 36)
-              .keyboardType(.decimalPad)
-              .autocorrectionDisabled()
-          }
+        VStack(spacing: 0) {
+          TextField("Name", text: $alias)
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 22)
+            .frame(height: 54)
+          Divider().padding(.horizontal, 22)
+          TextField("192.168.178.20", text: $host)
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 22)
+            .frame(height: 54)
+            .keyboardType(.decimalPad)
+            .autocorrectionDisabled()
         }
+        .background(.regularMaterial, in: Capsule())
         Spacer(minLength: 0)
       }
       .padding(20)
@@ -471,7 +499,7 @@ struct AddFavoriteSheet: View {
       }
     }
     .presentationDetents([.height(300)])
-    .presentationCornerRadius(36)
+    .presentationCornerRadius(55)
   }
 }
 
@@ -517,5 +545,45 @@ private struct NonBouncingScrollProbe: UIViewRepresentable {
         ancestor = view.superview
       }
     }
+  }
+}
+
+private struct SelectedFileThumbnail: View {
+  let file: SelectedFile
+  @State private var thumbnail: UIImage?
+
+  var body: some View {
+    ZStack {
+      if let thumbnail {
+        Image(uiImage: thumbnail)
+          .resizable()
+          .scaledToFill()
+      } else {
+        Image(systemName: symbol)
+          .font(.system(size: 22))
+          .foregroundStyle(.tint)
+      }
+    }
+    .frame(width: 48, height: 48)
+    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+    .clipShape(RoundedRectangle(cornerRadius: 14))
+    .task(id: file.id) {
+      let scoped = file.url.startAccessingSecurityScopedResource()
+      defer { if scoped { file.url.stopAccessingSecurityScopedResource() } }
+      let request = QLThumbnailGenerator.Request(
+        fileAt: file.url,
+        size: CGSize(width: 48, height: 48),
+        scale: UIScreen.main.scale,
+        representationTypes: .all
+      )
+      thumbnail = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).uiImage
+    }
+  }
+
+  private var symbol: String {
+    if file.fileType.hasPrefix("image/") { return "photo" }
+    if file.fileType.hasPrefix("video/") { return "film" }
+    if file.fileType.hasPrefix("audio/") { return "waveform" }
+    return "doc.fill"
   }
 }
