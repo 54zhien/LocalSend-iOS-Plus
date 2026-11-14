@@ -66,6 +66,8 @@ final class AppModel {
   private(set) var deviceIdentity: DeviceIdentity
   private(set) var addresses: [String] = []
   private(set) var serverRunning = false
+  private var bindRetries = 0
+  private static let maxBindRetries = 4
   private(set) var receivedFiles: [ReceivedFile] = []
   let destination = DestinationStore()
   private let announcer = Announcer()
@@ -254,8 +256,24 @@ final class AppModel {
     publishInfo()
   }
 
+  /// Re-reads the interfaces and re-arms the listener. Also the manual recovery path when
+  /// another LocalSend instance is still holding the port.
   func refreshIdentity() {
     refreshAddresses()
+    rebindServer()
+  }
+
+  private func rebindServer() {
+    guard started else { return }
+    bindRetries = 0
+    server.stop()
+    configureServer()
+    do {
+      try server.start()
+    } catch {
+      errorMessage = error.localizedDescription
+      scheduleBindRetry()
+    }
   }
 
   func refreshAddresses() {
@@ -309,11 +327,31 @@ final class AppModel {
         guard let self else { return }
         self.serverRunning = running
         if running {
+          self.bindRetries = 0
           self.publishInfo()
           self.announcePresence()
         } else if let failure {
           self.errorMessage = failure
+          self.scheduleBindRetry()
         }
+      }
+    }
+  }
+
+  /// Another LocalSend (or a previous instance of this app) can still hold the port while
+  /// it tears down. Retry a few times before telling the user to close it.
+  private func scheduleBindRetry() {
+    guard started, bindRetries < Self.maxBindRetries else { return }
+    bindRetries += 1
+    Task { @MainActor [weak self] in
+      try? await Task.sleep(for: .milliseconds(900))
+      guard let self, self.started, !self.server.isRunning else { return }
+      self.server.stop()
+      self.configureServer()
+      do {
+        try self.server.start()
+      } catch {
+        self.errorMessage = error.localizedDescription
       }
     }
   }
