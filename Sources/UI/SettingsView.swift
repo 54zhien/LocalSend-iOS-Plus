@@ -397,6 +397,8 @@ struct SettingsView: View {
   private var sendCard: some View {
     GlassCard {
       VStack(alignment: .leading, spacing: 16) {
+        toggleRow("Auto accept link requests", isOn: $settings.shareViaLinkAutoAccept)
+          .onChange(of: settings.shareViaLinkAutoAccept) { model.applyNetworkSettings() }
         toggleRow("Web download page", isOn: $settings.downloadEnabled)
           .onChange(of: settings.downloadEnabled) {
             model.applyNetworkSettings()

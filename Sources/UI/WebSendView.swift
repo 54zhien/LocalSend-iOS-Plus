@@ -4,6 +4,7 @@ import UIKit
 struct WebSendView: View {
   @Environment(AppModel.self) private var model
   @Environment(\.dismiss) private var dismiss
+  @State private var showingDownloadRequest = false
 
   let files: [SelectedFile]
 
@@ -47,5 +48,19 @@ struct WebSendView: View {
     }
     .onAppear { model.beginWebSend(files: files) }
     .onDisappear { model.endWebSend() }
+    .onChange(of: model.downloadRequest?.id) { _, requestId in
+      showingDownloadRequest = requestId != nil
+    }
+    .alert("Download request", isPresented: $showingDownloadRequest) {
+      Button("Decline", role: .cancel) {
+        if let request = model.downloadRequest { model.decideDownload(request, accepted: false) }
+      }
+      Button("Allow") {
+        if let request = model.downloadRequest { model.decideDownload(request, accepted: true) }
+      }
+    } message: {
+      Text(verbatim: "\(model.downloadRequest?.peerIp ?? "") ")
+        + Text("wants to download the selected files.")
+    }
   }
 }

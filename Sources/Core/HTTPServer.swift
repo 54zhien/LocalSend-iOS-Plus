@@ -8,6 +8,7 @@ enum ServerEvent {
   case incoming(sessionId: String, peerAlias: String, peerFingerprint: String, files: [FileDTO])
   case received(fileName: String, url: URL)
   case peerSeen(PeerDescription)
+  case downloadRequested(id: String, peerIp: String)
 
   struct PeerDescription {
     let alias: String
@@ -46,6 +47,7 @@ final class LocalHTTPServer {
   private var activeSessionId: String?
   private var pinFailures: [String: Int] = [:]
   private var downloadSession: (id: String, files: [String: FileDTO], tokens: [String: String])?
+  private var pendingDownloads: [String: HTTPConnection] = [:]
 
   private(set) var isRunning = false
   var port: Int = 53317
@@ -58,6 +60,7 @@ final class LocalHTTPServer {
   var downloadURLProvider: ((FileDTO) -> URL?)?
   var webUploadEnabled = false
   var webSendEnabled = false
+  var webSendAutoAccept = false
   var verifyChecksums = true
   /// Where received files are written; falls back to `Documents/LocalSend`.
   var destinationProvider: (() -> URL)?
@@ -113,6 +116,7 @@ final class LocalHTTPServer {
     listener = nil
     isRunning = false
     sessions.removeAll()
+    pendingDownloads.removeAll()
     activeSessionId = nil
   }
 
@@ -344,16 +348,37 @@ final class LocalHTTPServer {
       return
     }
 
+    if webSendEnabled && !webSendAutoAccept && !pendingDownloads.isEmpty {
+      connection.respondJSON(status: 409, value: ["message": "Another download request is pending"])
+      return
+    }
+
     let files = downloadProvider()
     var tokens: [String: String] = [:]
     for file in files { tokens[file.id] = UUID().uuidString }
     let sessionId = UUID().uuidString
     downloadSession = (sessionId, Dictionary(uniqueKeysWithValues: files.map { ($0.id, $0) }), tokens)
 
-    connection.respondJSON(
-      status: 200,
-      value: PrepareUploadResponse(sessionId: sessionId, files: tokens)
-    )
+    if webSendEnabled && !webSendAutoAccept {
+      pendingDownloads[sessionId] = connection
+      onEvent?(.downloadRequested(id: sessionId, peerIp: connection.peerAddress))
+    } else {
+      connection.respondJSON(
+        status: 200,
+        value: PrepareUploadResponse(sessionId: sessionId, files: tokens)
+      )
+    }
+  }
+
+  func decideDownload(id: String, accepted: Bool) {
+    queue.async { [weak self] in
+      guard let self, let connection = self.pendingDownloads.removeValue(forKey: id) else { return }
+      guard accepted, let session = self.downloadSession, session.id == id else {
+        connection.respondJSON(status: 403, value: ["message": "Download declined"])
+        return
+      }
+      connection.respondJSON(status: 200, value: PrepareUploadResponse(sessionId: id, files: session.tokens))
+    }
   }
 
   private func handleDownload(connection: HTTPConnection, path: String) {

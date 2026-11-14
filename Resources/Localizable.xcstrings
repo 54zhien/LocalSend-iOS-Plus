@@ -11941,6 +11941,46 @@
         }
       }
     },
+    "Auto accept link requests": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通过链接分享时自动接受请求"
+          }
+        }
+      }
+    },
+    "Download request": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载请求"
+          }
+        }
+      }
+    },
+    "Allow": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许"
+          }
+        }
+      }
+    },
+    "wants to download the selected files.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "想要下载所选文件。"
+          }
+        }
+      }
+    },
     "Scan interval": {
       "localizations": {
         "zh-Hans": {

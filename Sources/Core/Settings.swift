@@ -50,6 +50,7 @@ final class AppSettings {
   var deviceType: DeviceType { didSet { save() } }
   var deviceModel: String { didSet { save() } }
   var discoveryTimeout: Double { didSet { save() } }
+  var shareViaLinkAutoAccept: Bool { didSet { save() } }
 
   private struct Snapshot: Codable {
     var alias: String
@@ -75,6 +76,7 @@ final class AppSettings {
     var deviceType: DeviceType?
     var deviceModel: String?
     var discoveryTimeout: Double?
+    var shareViaLinkAutoAccept: Bool?
 
     init(from decoder: Decoder) throws {
       let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -101,6 +103,7 @@ final class AppSettings {
       deviceType = try container.decodeIfPresent(DeviceType.self, forKey: .deviceType)
       deviceModel = try container.decodeIfPresent(String.self, forKey: .deviceModel)
       discoveryTimeout = try container.decodeIfPresent(Double.self, forKey: .discoveryTimeout)
+      shareViaLinkAutoAccept = try container.decodeIfPresent(Bool.self, forKey: .shareViaLinkAutoAccept)
     }
 
     init(
@@ -126,7 +129,8 @@ final class AppSettings {
       verifyChecksums: Bool,
       deviceType: DeviceType,
       deviceModel: String,
-      discoveryTimeout: Double
+      discoveryTimeout: Double,
+      shareViaLinkAutoAccept: Bool
     ) {
       self.alias = alias
       self.quickSave = quickSave
@@ -151,6 +155,7 @@ final class AppSettings {
       self.deviceType = deviceType
       self.deviceModel = deviceModel
       self.discoveryTimeout = discoveryTimeout
+      self.shareViaLinkAutoAccept = shareViaLinkAutoAccept
     }
   }
 
@@ -182,6 +187,7 @@ final class AppSettings {
       deviceType = snapshot.deviceType ?? .mobile
       deviceModel = snapshot.deviceModel ?? UIDevice.current.model
       discoveryTimeout = snapshot.discoveryTimeout ?? 0.9
+      shareViaLinkAutoAccept = snapshot.shareViaLinkAutoAccept ?? false
     } else {
       alias = UIDevice.current.name
       quickSave = true
@@ -206,6 +212,7 @@ final class AppSettings {
       deviceType = .mobile
       deviceModel = UIDevice.current.model
       discoveryTimeout = 0.9
+      shareViaLinkAutoAccept = false
     }
   }
 
@@ -233,7 +240,8 @@ final class AppSettings {
       verifyChecksums: verifyChecksums,
       deviceType: deviceType,
       deviceModel: deviceModel,
-      discoveryTimeout: discoveryTimeout
+      discoveryTimeout: discoveryTimeout,
+      shareViaLinkAutoAccept: shareViaLinkAutoAccept
     )
     guard let data = try? JSONEncoder().encode(snapshot) else { return }
     UserDefaults.standard.set(data, forKey: "settings")

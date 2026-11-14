@@ -51,6 +51,10 @@ final class AppModel {
     let files: [SelectedFile]
     var alias: String { device.alias }
   }
+  struct DownloadRequest: Identifiable {
+    let id: String
+    let peerIp: String
+  }
 
   let settings = AppSettings()
   let history = HistoryStore()
@@ -69,6 +73,7 @@ final class AppModel {
   var incoming: IncomingRequest?
   var outgoing: OutgoingTransfer?
   var pinRequest: PinRequest?
+  var downloadRequest: DownloadRequest?
   var errorMessage: String?
   /// Files staged for the next send, also filled by the Share Extension.
   var selection: [SelectedFile] = []
@@ -234,6 +239,7 @@ final class AppModel {
     server.verifyChecksums = settings.verifyChecksums
     server.webUploadEnabled = webReceiveMode
     server.webSendEnabled = webSendFiles != nil
+    server.webSendAutoAccept = settings.shareViaLinkAutoAccept
     server.pin = webSendFiles != nil || settings.pin.isEmpty ? nil : settings.pin
     server.port = settings.port
     if let webSendFiles {
@@ -277,6 +283,8 @@ final class AppModel {
 
   func endWebSend() {
     guard webSendFiles != nil else { return }
+    if let downloadRequest { server.decideDownload(id: downloadRequest.id, accepted: false) }
+    downloadRequest = nil
     webSendFiles = nil
     applyNetworkSettings()
   }
@@ -320,7 +328,14 @@ final class AppModel {
           self.discovery.absorb(device)
         }
       }
+    case let .downloadRequested(id, peerIp):
+      downloadRequest = DownloadRequest(id: id, peerIp: peerIp)
     }
+  }
+
+  func decideDownload(_ request: DownloadRequest, accepted: Bool) {
+    server.decideDownload(id: request.id, accepted: accepted)
+    if downloadRequest?.id == request.id { downloadRequest = nil }
   }
 
   // MARK: Receiving
