@@ -261,7 +261,11 @@ final class AppModel {
   /// another LocalSend instance is still holding the port.
   func refreshIdentity() {
     refreshAddresses()
-    rebindServer()
+    // Pull-to-refresh must not disturb a healthy listener: cancelling and rebinding in
+    // the same turn is what produced EADDRINUSE. Only recover when it is actually down.
+    if !server.isRunning {
+      rebindServer()
+    }
   }
 
   private func rebindServer() {
