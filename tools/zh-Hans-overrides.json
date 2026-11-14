@@ -109,6 +109,7 @@
   "Single sends to one device. Multiple keeps the selection so you can send it to several devices. Share via link lets browsers download the selection.": "单设备模式发送后清空选择；多设备模式保留选择，可依次发送给多台设备；通过链接分享可供浏览器下载。",
   "Finish the current transfer first.": "请先完成当前传输。",
   "Add favourite": "添加收藏设备",
+  "Cannot connect to the favourite device.": "无法连接收藏设备，请检查地址、端口和网络。",
   "No transfers yet": "暂无传输记录",
   "Received and sent files show up here.": "接收和发送的文件会显示在这里。",
   "The receiver declined the transfer.": "接收方拒绝了传输。",

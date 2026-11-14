@@ -12141,6 +12141,16 @@
         }
       }
     },
+    "Cannot connect to the favourite device.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法连接收藏设备，请检查地址、端口和网络。"
+          }
+        }
+      }
+    },
     "The receiver declined the transfer.": {
       "localizations": {
         "zh-Hans": {

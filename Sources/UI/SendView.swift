@@ -229,7 +229,19 @@ struct SendView: View {
             Spacer(minLength: 0)
 
             Button {
-              send(to: favorite.asDevice)
+              Task {
+                guard let resolved = await DeviceProbe.info(
+                  host: favorite.host,
+                  port: favorite.port,
+                  identity: model.identity,
+                  timeout: max(2, model.settings.discoveryTimeout)
+                ) else {
+                  model.errorMessage = String(localized: "Cannot connect to the favourite device.")
+                  return
+                }
+                model.favorites.update(favorite, from: resolved)
+                send(to: resolved)
+              }
             } label: {
               Image(systemName: "paperplane.fill")
                 .foregroundStyle(model.selection.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))

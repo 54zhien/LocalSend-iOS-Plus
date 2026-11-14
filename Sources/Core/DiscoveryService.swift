@@ -127,17 +127,17 @@ final class DiscoveryService {
 /// TLS peers reject plain HTTP, so every host is tried over https first (trust accepted for the
 /// handshake, the announced fingerprint pins later transfers) and over http as a fallback.
 enum DeviceProbe {
-  static func info(host: String, identity: LocalIdentity, timeout: Double) async -> Device? {
+  static func info(host: String, port: Int = 53317, identity: LocalIdentity, timeout: Double) async -> Device? {
     for scheme in ["https", "http"] {
-      if let device = await probe(host: host, scheme: scheme, identity: identity, timeout: timeout) {
+      if let device = await probe(host: host, port: port, scheme: scheme, identity: identity, timeout: timeout) {
         return device
       }
     }
     return nil
   }
 
-  private static func probe(host: String, scheme: String, identity: LocalIdentity, timeout: Double) async -> Device? {
-    guard let url = URL(string: "\(scheme)://\(host):53317/api/localsend/v2/info") else { return nil }
+  private static func probe(host: String, port: Int, scheme: String, identity: LocalIdentity, timeout: Double) async -> Device? {
+    guard let url = URL(string: "\(scheme)://\(host):\(port)/api/localsend/v2/info") else { return nil }
 
     let configuration = URLSessionConfiguration.ephemeral
     configuration.timeoutIntervalForRequest = timeout
@@ -152,7 +152,7 @@ enum DeviceProbe {
 
     var request = URLRequest(url: url)
     request.httpMethod = "GET"
-    request.timeoutInterval = 0.9
+    request.timeoutInterval = timeout
 
     guard let (data, response) = try? await session.data(for: request),
       let http = response as? HTTPURLResponse,
@@ -168,7 +168,7 @@ enum DeviceProbe {
       alias: dto.alias,
       deviceType: DeviceType(wire: dto.deviceType),
       host: host,
-      port: dto.port ?? 53317,
+      port: dto.port ?? port,
       lastSeen: Date(),
       protocolName: scheme
     )
