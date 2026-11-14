@@ -63,6 +63,26 @@ These are tracked, not hidden:
 - **Only the strings that exist in the UI are translated.** New UI text needs an entry in
   `tools/strings.json`; CI fails when `Resources/Localizable.xcstrings` is stale.
 
+## Three things that will bite you
+
+Each of these shipped as a bug, and each one looked like a network problem while it was
+happening. They are written down so the next reader does not re-derive them.
+
+- **A listener cannot be restarted on the same tick.** `NWListener.cancel()` releases the socket
+  asynchronously, so `stop()` immediately followed by `start()` fails with `EADDRINUSE (48)`, and a
+  retry loop burns every attempt the same way. `AppModel.rebindServer()` waits 350 ms between the
+  two calls, and any path that only wants fresh interfaces (foreground resume, pull to refresh)
+  reuses the running listener instead of rebinding it.
+- **iOS takes the listening socket away in the background.** The app keeps a short
+  `beginBackgroundTask` grace period, and on `scenePhase == .active` it rebinds if the listener
+  died, then restarts discovery and announcing. Without that the app returns to the foreground
+  looking healthy while no peer can reach it.
+- **A connection has to be retained, not just started.** `HTTPConnection.receive()` captures `self`
+  weakly, so a handler that only does `HTTPConnection(...).start()` frees the object immediately:
+  the TLS handshake completes at the Networking layer, the request is never read, and the peer
+  waits until it times out. `LocalHTTPServer` keeps live connections in `connections` and drops
+  them from `HTTPConnection.onClose`.
+
 ## Localisation
 
 `Resources/i18n/*.json` are copied verbatim from upstream. `tools/strings.json` maps each English
