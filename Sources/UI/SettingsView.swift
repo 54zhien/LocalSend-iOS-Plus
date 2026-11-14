@@ -406,24 +406,6 @@ struct SettingsView: View {
   private var aboutCard: some View {
     GlassCard {
       VStack(alignment: .leading, spacing: 10) {
-        HStack {
-          Text("App")
-          Spacer()
-          Text("LocalSend Plus").foregroundStyle(.secondary)
-        }
-        .font(.subheadline)
-        HStack {
-          Text("Protocol")
-          Spacer()
-          Text("v2.2 · \(model.deviceIdentity.protocolName.uppercased())").foregroundStyle(.secondary)
-        }
-        .font(.subheadline)
-        HStack {
-          Text("Devices seen")
-          Spacer()
-          Text(String(model.discovery.devices.count)).foregroundStyle(.secondary)
-        }
-        .font(.subheadline)
         Link("Support LocalSend", destination: URL(string: "https://localsend.org")!)
         Link("Privacy policy", destination: URL(string: "https://localsend.org/privacy")!)
         Link("Terms of use", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
